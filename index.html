@@ -1,18 +1,132 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Phase 2 – Meyda + p5.js Visuals</title>
+    <style>
+      body { margin:0; background:#000; color:#fff; font-family: system-ui, -apple-system, sans-serif; }
+      .ui { position:fixed; top:10px; left:10px; z-index:10; display:flex; gap:8px; align-items:center; }
+      button, select { padding:6px 10px; }
+      canvas { display:block; }
+    </style>
+    <!-- p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <!-- Meyda -->
+    <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
+  </head>
   <body>
-    <button id="start">Start Audio Test</button>
+    <div class="ui">
+      <button id="start">Start</button>
+      <select id="inputs"></select>
+    </div>
+
     <script>
-      document.getElementById("start").onclick = async () => {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const context = new AudioContext();
-          const source = context.createMediaStreamSource(stream);
-          console.log("Audio stream connected:", source);
-        } catch (err) {
-          console.error("Error accessing audio:", err);
-        }
-      };
+      let audioContext, sourceNode, meydaAnalyzer, analyserNode;
+      let rms = 0, bass = 0, mid = 0, treble = 0;
+      let spectrum = [];
+
+      const startBtn = document.getElementById('start');
+      const inputSelect = document.getElementById('inputs');
+
+      async function listInputs() {
+        try { const tmp = await navigator.mediaDevices.getUserMedia({ audio: true }); tmp.getTracks().forEach(t => t.stop()); } catch(e){}
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = devices.filter(d => d.kind === 'audioinput');
+        inputSelect.innerHTML = '';
+        inputs.forEach((d, i) => {
+          const opt = document.createElement('option');
+          opt.value = d.deviceId;
+          opt.textContent = d.label || `Input ${i+1}`;
+          inputSelect.appendChild(opt);
+        });
+        const serato = inputs.find(d => /serato/i.test(d.label));
+        if (serato) inputSelect.value = serato.deviceId;
+      }
+
+      function bandEnergy(spec, sampleRate, fmin, fmax) {
+        const nyquist = sampleRate / 2;
+        const binHz = nyquist / (spec.length - 1);
+        const start = Math.max(0, Math.floor(fmin / binHz));
+        const end = Math.min(spec.length - 1, Math.ceil(fmax / binHz));
+        let sum = 0;
+        for (let i = start; i <= end; i++) sum += spec[i];
+        const count = Math.max(1, end - start + 1);
+        return sum / count;
+      }
+
+      async function startAudio() {
+        const deviceId = inputSelect.value || undefined;
+        const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') await audioContext.resume();
+
+        sourceNode = audioContext.createMediaStreamSource(stream);
+
+        // Optional extra analyser if you want smoothing later
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 1024;
+        sourceNode.connect(analyserNode);
+
+        meydaAnalyzer = Meyda.createMeydaAnalyzer({
+          audioContext,
+          source: sourceNode,
+          bufferSize: 512,
+          featureExtractors: ['rms', 'amplitudeSpectrum'],
+          callback: (features) => {
+            rms = features.rms || 0;
+            spectrum = features.amplitudeSpectrum || spectrum;
+
+            const sr = audioContext.sampleRate;
+            bass   = bandEnergy(spectrum, sr,  20,  250);
+            mid    = bandEnergy(spectrum, sr, 250, 2000);
+            treble = bandEnergy(spectrum, sr, 2000, 8000);
+          }
+        });
+        meydaAnalyzer.start();
+      }
+
+      // p5 sketch
+      let w, h;
+      new p5(p => {
+        p.setup = () => {
+          w = p.windowWidth; h = p.windowHeight;
+          p.createCanvas(w, h);
+          p.frameRate(60);
+          p.noStroke();
+        };
+        p.windowResized = () => {
+          w = p.windowWidth; h = p.windowHeight;
+          p.resizeCanvas(w, h);
+        };
+        p.draw = () => {
+          // Background with slight fade for trails
+          p.fill(0, 40); p.rect(0,0,w,h);
+
+          // RMS-driven circle
+          const r = p.map(rms, 0, 0.3, 20, Math.min(w, h)/2, true);
+          p.push();
+          p.translate(w/2, h/2);
+          p.fill(255, 200);
+          p.ellipse(0, 0, r*2, r*2);
+          p.pop();
+
+          // 3-band bars
+          const barW = w / 6;
+          const maxH = h * 0.6;
+          const bassH = p.constrain(p.map(bass,   0, 0.10, 0, maxH), 0, maxH);
+          const midH  = p.constrain(p.map(mid,    0, 0.05, 0, maxH), 0, maxH);
+          const trebH = p.constrain(p.map(treble, 0, 0.02, 0, maxH), 0, maxH);
+
+          p.fill(255,80,80);   p.rect(w*0.2 - barW/2, h - bassH, barW, bassH);
+          p.fill(80,255,120);  p.rect(w*0.5 - barW/2, h - midH,  barW, midH);
+          p.fill(120,160,255); p.rect(w*0.8 - barW/2, h - trebH, barW, trebH);
+        };
+      });
+
+      startBtn.addEventListener('click', startAudio);
+      if (navigator.mediaDevices) listInputs();
     </script>
   </body>
 </html>
