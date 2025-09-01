@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <button id="start">Start Audio Test</button>
+    <script>
+      document.getElementById("start").onclick = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const context = new AudioContext();
+          const source = context.createMediaStreamSource(stream);
+          console.log("Audio stream connected:", source);
+        } catch (err) {
+          console.error("Error accessing audio:", err);
+        }
+      };
+    </script>
+  </body>
+</html>
