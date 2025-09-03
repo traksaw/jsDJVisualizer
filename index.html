@@ -1,132 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Phase 2 – Meyda + p5.js Visuals</title>
-    <style>
-      body { margin:0; background:#000; color:#fff; font-family: system-ui, -apple-system, sans-serif; }
-      .ui { position:fixed; top:10px; left:10px; z-index:10; display:flex; gap:8px; align-items:center; }
-      button, select { padding:6px 10px; }
-      canvas { display:block; }
-    </style>
-    <!-- p5.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
-    <!-- Meyda -->
-    <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
-  </head>
-  <body>
-    <div class="ui">
-      <button id="start">Start</button>
-      <select id="inputs"></select>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DJ Audio Visualizer</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+
+<body>
+  <!-- Control Panel -->
+  <div id="controls">
+    <h3>DJ Audio Visualizer</h3>
+    <button id="startBtn">Start Audio</button>
+    <button id="stopBtn" disabled>Stop Audio</button>
+
+    <div class="slider-container">
+      <label>Visualization Mode:</label>
+      <select id="vizMode">
+        <option value="spectrum">Frequency Spectrum</option>
+        <option value="waveform">Waveform</option>
+        <option value="particles">Particles</option>
+        <option value="eq-bars">EQ Bars</option>
+        <option value="dj-mixer">DJ Mixer Style</option>
+      </select>
     </div>
 
-    <script>
-      let audioContext, sourceNode, meydaAnalyzer, analyserNode;
-      let rms = 0, bass = 0, mid = 0, treble = 0;
-      let spectrum = [];
+    <div class="slider-container">
+      <label>Sensitivity: <span id="sensitivityValue">1.0</span></label>
+      <input type="range" id="sensitivity" min="0.1" max="3.0" step="0.1" value="1.0">
+    </div>
 
-      const startBtn = document.getElementById('start');
-      const inputSelect = document.getElementById('inputs');
+    <div class="slider-container">
+      <label>Bass Boost: <span id="bassBoostValue">1.0</span></label>
+      <input type="range" id="bassBoost" min="0.5" max="3.0" step="0.1" value="1.0">
+    </div>
 
-      async function listInputs() {
-        try { const tmp = await navigator.mediaDevices.getUserMedia({ audio: true }); tmp.getTracks().forEach(t => t.stop()); } catch(e){}
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const inputs = devices.filter(d => d.kind === 'audioinput');
-        inputSelect.innerHTML = '';
-        inputs.forEach((d, i) => {
-          const opt = document.createElement('option');
-          opt.value = d.deviceId;
-          opt.textContent = d.label || `Input ${i+1}`;
-          inputSelect.appendChild(opt);
-        });
-        const serato = inputs.find(d => /serato/i.test(d.label));
-        if (serato) inputSelect.value = serato.deviceId;
-      }
+    <div class="slider-container">
+      <label>Animation Speed: <span id="animSpeedValue">1.0</span></label>
+      <input type="range" id="animSpeed" min="0.1" max="2.0" step="0.1" value="1.0">
+    </div>
 
-      function bandEnergy(spec, sampleRate, fmin, fmax) {
-        const nyquist = sampleRate / 2;
-        const binHz = nyquist / (spec.length - 1);
-        const start = Math.max(0, Math.floor(fmin / binHz));
-        const end = Math.min(spec.length - 1, Math.ceil(fmax / binHz));
-        let sum = 0;
-        for (let i = start; i <= end; i++) sum += spec[i];
-        const count = Math.max(1, end - start + 1);
-        return sum / count;
-      }
+    <div id="status">Status: Ready</div>
+    <div id="performance-info">
+      <div>FPS: <span id="fps">0</span></div>
+      <div>Latency: <span id="latency">0ms</span></div>
+    </div>
+  </div>
 
-      async function startAudio() {
-        const deviceId = inputSelect.value || undefined;
-        const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+  <!-- EQ Display -->
+  <div id="eq-display">
+    <h4>EQ Levels</h4>
+    <div class="eq-bar">
+      <span class="eq-label">Bass:</span>
+      <div class="eq-meter">
+        <div class="eq-fill bass" id="bassBar"></div>
+      </div>
+      <span id="bassValue">0</span>
+    </div>
+    <div class="eq-bar">
+      <span class="eq-label">Mid:</span>
+      <div class="eq-meter">
+        <div class="eq-fill mid" id="midBar"></div>
+      </div>
+      <span id="midValue">0</span>
+    </div>
+    <div class="eq-bar">
+      <span class="eq-label">High:</span>
+      <div class="eq-meter">
+        <div class="eq-fill high" id="highBar"></div>
+      </div>
+      <span id="highValue">0</span>
+    </div>
+    <div class="eq-bar">
+      <span class="eq-label">RMS:</span>
+      <div class="eq-meter">
+        <div class="eq-fill rms" id="rmsBar"></div>
+      </div>
+      <span id="rmsValue">0</span>
+    </div>
+  </div>
 
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioContext.state === 'suspended') await audioContext.resume();
+  <!-- Device Info Panel -->
+  <div id="device-info">
+    <h4>Audio Devices</h4>
+    <div id="device-list">
+      <p>Click "Start Audio" to detect devices</p>
+    </div>
+  </div>
 
-        sourceNode = audioContext.createMediaStreamSource(stream);
+  <!-- Replace the CDN scripts with these alternatives -->
+  <script src="https://unpkg.com/p5@1.7.0/lib/p5.min.js"></script>
+  <script src="https://unpkg.com/meyda@5.3.0/dist/web/meyda.min.js"></script>
 
-        // Optional extra analyser if you want smoothing later
-        analyserNode = audioContext.createAnalyser();
-        analyserNode.fftSize = 1024;
-        sourceNode.connect(analyserNode);
+  <!-- Application Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/audio-processor.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/ui-controller.js"></script>
+  <script src="js/main.js"></script>
+</body>
 
-        meydaAnalyzer = Meyda.createMeydaAnalyzer({
-          audioContext,
-          source: sourceNode,
-          bufferSize: 512,
-          featureExtractors: ['rms', 'amplitudeSpectrum'],
-          callback: (features) => {
-            rms = features.rms || 0;
-            spectrum = features.amplitudeSpectrum || spectrum;
-
-            const sr = audioContext.sampleRate;
-            bass   = bandEnergy(spectrum, sr,  20,  250);
-            mid    = bandEnergy(spectrum, sr, 250, 2000);
-            treble = bandEnergy(spectrum, sr, 2000, 8000);
-          }
-        });
-        meydaAnalyzer.start();
-      }
-
-      // p5 sketch
-      let w, h;
-      new p5(p => {
-        p.setup = () => {
-          w = p.windowWidth; h = p.windowHeight;
-          p.createCanvas(w, h);
-          p.frameRate(60);
-          p.noStroke();
-        };
-        p.windowResized = () => {
-          w = p.windowWidth; h = p.windowHeight;
-          p.resizeCanvas(w, h);
-        };
-        p.draw = () => {
-          // Background with slight fade for trails
-          p.fill(0, 40); p.rect(0,0,w,h);
-
-          // RMS-driven circle
-          const r = p.map(rms, 0, 0.3, 20, Math.min(w, h)/2, true);
-          p.push();
-          p.translate(w/2, h/2);
-          p.fill(255, 200);
-          p.ellipse(0, 0, r*2, r*2);
-          p.pop();
-
-          // 3-band bars
-          const barW = w / 6;
-          const maxH = h * 0.6;
-          const bassH = p.constrain(p.map(bass,   0, 0.10, 0, maxH), 0, maxH);
-          const midH  = p.constrain(p.map(mid,    0, 0.05, 0, maxH), 0, maxH);
-          const trebH = p.constrain(p.map(treble, 0, 0.02, 0, maxH), 0, maxH);
-
-          p.fill(255,80,80);   p.rect(w*0.2 - barW/2, h - bassH, barW, bassH);
-          p.fill(80,255,120);  p.rect(w*0.5 - barW/2, h - midH,  barW, midH);
-          p.fill(120,160,255); p.rect(w*0.8 - barW/2, h - trebH, barW, trebH);
-        };
-      });
-
-      startBtn.addEventListener('click', startAudio);
-      if (navigator.mediaDevices) listInputs();
-    </script>
-  </body>
 </html>
