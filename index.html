@@ -2,21 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Phase 1 – Serato → Browser Audio Test</title>
+    <title>Phase 2 – Serato → Meyda → p5.js</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="preload" href="./styles/styles.css" as="style" />
     <link rel="stylesheet" href="./styles/styles.css" />
+    <!-- p5.js (global) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <!-- Meyda (global window.Meyda) -->
+    <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
   </head>
   <body>
     <div class="wrap">
-      <h1>Phase 1: Capture Serato Audio</h1>
+      <h1>Phase 2: Live Analysis + Visuals</h1>
       <p class="hint">
         In Serato → <b>Setup → Audio</b> enable <i>“Make Audio Output available to other applications.”</i><br />
-        Then pick <b>Serato Virtual Audio</b> and press <b>Start</b>.
+        Pick <b>Serato Virtual Audio</b>, then press <b>Start</b>.
       </p>
 
       <div class="row" role="group" aria-label="Controls">
-        <button id="start" type="button">Start Audio Test</button>
+        <button id="start" type="button">Start</button>
         <label for="inputs">Input:</label>
         <select id="inputs" aria-label="Audio input device"></select>
         <button id="stop" type="button" disabled>Stop</button>
@@ -27,6 +31,6 @@
 
     <!-- App (ES modules) -->
     <script type="module" src="./src/app.js"></script>
-    <noscript>Please enable JavaScript to run the audio test.</noscript>
+    <noscript>Please enable JavaScript to run the demo.</noscript>
   </body>
 </html>
