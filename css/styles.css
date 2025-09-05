@@ -1,0 +1,143 @@
+/* DJ Visualizer Styles */
+
+/* Base styles */
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+canvas {
+  display: block;
+}
+
+/* UI Components */
+.ui {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 8px;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  max-width: 300px;
+}
+
+.ui-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-container label {
+  font-size: 10px;
+  min-width: 60px;
+  color: #ccc;
+}
+
+/* Form elements */
+button, select {
+  padding: 4px 8px;
+  background: #333;
+  color: #fff;
+  border: 1px solid #555;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+button:hover {
+  background: #444;
+}
+
+button.active {
+  background: #0066cc;
+  border-color: #0088ff;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+select {
+  min-width: 100px;
+  font-size: 10px;
+}
+
+input[type="range"] {
+  width: 80px;
+  height: 3px;
+  background: #555;
+  outline: none;
+  border-radius: 2px;
+  accent-color: #0066cc;
+}
+
+/* Info and stats */
+.info {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.performance-stats {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  font-size: 11px;
+  opacity: 0.5;
+  color: #0f0;
+}
+
+/* Utility classes */
+.hidden {
+  display: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .ui {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .ui-row {
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+  
+  .slider-container {
+    margin-bottom: 4px;
+  }
+  
+  .info {
+    font-size: 10px;
+    bottom: 5px;
+    right: 5px;
+  }
+  
+  .performance-stats {
+    font-size: 10px;
+    top: 5px;
+    right: 5px;
+  }
+}
