@@ -12,8 +12,8 @@ function drawSmokeMode() {
   
   const bounds = p.getVisBounds();
   
-  // Generate smoke particles based on individual EQ bands
-  if (rms > 0.01) {
+  // Only generate particles when audio is actively playing
+  if (isAudioActive && rms > 0.01) {
     // Bass particles (red) - left side
     let bassCount = Math.floor(bass * sensitivity * 5);
     for (let i = 0; i < bassCount; i++) {
@@ -64,12 +64,12 @@ function drawSmokeMode() {
 }
 
 function drawFlockingMode() {
-  p.background(0, 30);
+  p.background(0, 20);
   
   let bounds = p.getVisBounds();
   
   // Initialize boids with EQ types if needed
-  if (flockingBoids.length < 60) {
+  if (isAudioActive && rms > 0.02 && flockingBoids.length < 60) {
     for (let i = flockingBoids.length; i < 60; i++) {
       let eqType = i < 20 ? 'bass' : (i < 40 ? 'mid' : 'high');
       let x = bounds.x + p.random(bounds.width);
@@ -108,12 +108,12 @@ function drawFlockingMode() {
 }
 
 function drawConnectedMode() {
-  p.background(0, 40);
+  p.background(0, 20);
   
   let bounds = p.getVisBounds();
   
-  // Generate connected particles by EQ band
-  if (rms > 0.005) {
+  // Generate connected particles based on audio
+  if (isAudioActive && rms > 0.01) {
     // Bass particles (red)
     let bassCount = Math.floor(bass * sensitivity * 10);
     for (let i = 0; i < bassCount; i++) {
@@ -179,14 +179,16 @@ function drawEQMode() {
   const bounds = p.getVisBounds();
   const barWidth = bounds.width / 5;
   
-  // Draw EQ bars for 5-band analysis
-  const bands = [
-    { value: subBass, label: 'SUB', x: bounds.x },
-    { value: bass, label: 'BASS', x: bounds.x + barWidth },
-    { value: lowMid, label: 'LOW MID', x: bounds.x + barWidth * 2 },
-    { value: highMid, label: 'HIGH MID', x: bounds.x + barWidth * 3 },
-    { value: presence, label: 'PRESENCE', x: bounds.x + barWidth * 4 }
-  ];
+  // Only show EQ bars when audio is active
+  if (isAudioActive) {
+    // Draw EQ bars for 5-band analysis
+    const bands = [
+      { value: subBass, label: 'SUB', x: bounds.x },
+      { value: bass, label: 'BASS', x: bounds.x + barWidth },
+      { value: lowMid, label: 'LOW MID', x: bounds.x + barWidth * 2 },
+      { value: highMid, label: 'HIGH MID', x: bounds.x + barWidth * 3 },
+      { value: presence, label: 'PRESENCE', x: bounds.x + barWidth * 4 }
+    ];
   
   p.colorMode(p.HSB);
   
@@ -204,6 +206,7 @@ function drawEQMode() {
     p.textSize(10);
     p.text(band.label, band.x + barWidth/2, bounds.y + bounds.height + 15);
   });
+  }
 }
 
 function drawSeparatedMode() {
@@ -211,15 +214,19 @@ function drawSeparatedMode() {
   
   const bounds = p.getVisBounds();
   
-  // Store waveform data for scrolling effect
-  waveformHistory.push({
-    subBass: subBass * sensitivity,
-    bass: bass * sensitivity,
-    lowMid: lowMid * sensitivity,
-    highMid: highMid * sensitivity,
-    presence: presence * sensitivity
-  });
-  
+  // Only update waveform when audio is active
+  if (isAudioActive) {
+    // Store waveform data for scrolling effect
+    waveformHistory.push({
+      subBass: subBass * sensitivity,
+      bass: bass * sensitivity,
+      lowMid: lowMid * sensitivity,
+      mid: mid * sensitivity,
+      highMid: highMid * sensitivity,
+      presence: presence * sensitivity,
+      treble: treble * sensitivity
+    });
+  }
   if (waveformHistory.length > bounds.width/3) {
     waveformHistory.shift();
   }

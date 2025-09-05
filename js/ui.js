@@ -39,7 +39,8 @@ function initializeUI() {
     flocking: document.getElementById('mode-flocking'),
     connected: document.getElementById('mode-connected'),
     eq: document.getElementById('mode-eq'),
-    separated: document.getElementById('mode-separated')
+    separated: document.getElementById('mode-separated'),
+    puzzle: document.getElementById('mode-puzzle')
   };
   
   setupEventListeners();

@@ -53,6 +53,18 @@ new p5(sketch => {
       lastFpsUpdate = p.millis();
     }
     
+    // Show audio status when no music is playing
+    if (!isAudioActive) {
+      p.push();
+      p.fill(100, 100, 100, 0.7);
+      p.textAlign(p.CENTER);
+      p.textSize(24);
+      p.text('Waiting for audio...', p.width/2, p.height/2);
+      p.textSize(16);
+      p.text('Play some music to see visualizations', p.width/2, p.height/2 + 40);
+      p.pop();
+    }
+    
     switch(currentMode) {
       case 'smoke':
         drawSmokeMode();
@@ -68,6 +80,9 @@ new p5(sketch => {
         break;
       case 'separated':
         drawSeparatedMode();
+        break;
+      case 'puzzle':
+        drawEQPuzzleMode();
         break;
     }
   };

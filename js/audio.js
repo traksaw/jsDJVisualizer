@@ -8,6 +8,12 @@ let spectrum = [];
 let subBass = 0, lowMid = 0, highMid = 0, presence = 0, brilliance = 0;
 let spectrumHistory = [];
 
+// Audio detection for visualization control
+let audioThreshold = 0.005; // Minimum RMS level to consider "music playing"
+let isAudioActive = false;
+let audioInactiveTime = 0;
+let lastAudioTime = 0;
+
 // Audio input elements - will be initialized when DOM is ready
 let startBtn, inputSelect;
 
@@ -32,25 +38,65 @@ async function startAudio() {
     audioContext,
     source: sourceNode,
     bufferSize: 512,
-    featureExtractors: ['rms', 'amplitudeSpectrum'],
-    callback: (features) => {
+    featureExtractors: ['rms', 'spectralCentroid', 'mfcc', 'chroma'],
+    callback: features => {
       rms = features.rms || 0;
-      spectrum = features.amplitudeSpectrum || spectrum;
-
-      const sr = audioContext.sampleRate;
-      bass   = bandEnergy(spectrum, sr,  20,  250) * 0.1;
-      mid    = bandEnergy(spectrum, sr, 250, 2000) * 0.1;
-      treble = bandEnergy(spectrum, sr, 2000, 8000) * 0.1;
-
-      subBass   = bandEnergy(spectrum, sr,  20,   60) * 0.1;
-      lowMid    = bandEnergy(spectrum, sr, 250,  500) * 0.1;
-      highMid   = bandEnergy(spectrum, sr, 500, 1000) * 0.1;
-      presence  = bandEnergy(spectrum, sr, 2000, 4000) * 0.1;
-      brilliance = bandEnergy(spectrum, sr, 4000, 8000) * 0.1;
+      
+      // Check if audio is active (music is playing)
+      const currentTime = Date.now();
+      if (rms > audioThreshold) {
+        isAudioActive = true;
+        lastAudioTime = currentTime;
+        audioInactiveTime = 0;
+      } else {
+        audioInactiveTime = currentTime - lastAudioTime;
+        // Consider audio inactive after 500ms of silence
+        if (audioInactiveTime > 500) {
+          isAudioActive = false;
+        }
+      }
+      
+      // Get frequency spectrum for EQ analysis
+      const freqData = new Uint8Array(analyserNode.frequencyBinCount);
+      analyserNode.getByteFrequencyData(freqData);
+      spectrum = Array.from(freqData);
+      
+      // Enhanced frequency band analysis for DJ mixer
+      const nyquist = audioContext.sampleRate / 2;
+      const binSize = nyquist / freqData.length;
+      
+      // More precise frequency ranges for DJ mixing
+      subBass = getFrequencyRange(freqData, 20, 60, binSize);      // Sub bass
+      bass = getFrequencyRange(freqData, 60, 250, binSize);        // Bass 
+      lowMid = getFrequencyRange(freqData, 250, 500, binSize);     // Low mid
+      mid = getFrequencyRange(freqData, 500, 2000, binSize);       // Mid
+      highMid = getFrequencyRange(freqData, 2000, 4000, binSize);  // High mid
+      presence = getFrequencyRange(freqData, 4000, 6000, binSize); // Presence
+      treble = getFrequencyRange(freqData, 6000, 20000, binSize);  // Treble/brilliance
+      
+      // Keep spectrum history for smoother visualizations
+      spectrumHistory.push([...spectrum]);
+      if (spectrumHistory.length > 10) spectrumHistory.shift();
     }
   });
   
   meydaAnalyzer.start();
+}
+
+// Calculate energy in a frequency range
+function getFrequencyRange(freqData, minHz, maxHz, binSize) {
+  const minBin = Math.floor(minHz / binSize);
+  const maxBin = Math.floor(maxHz / binSize);
+  
+  let sum = 0;
+  let count = 0;
+  
+  for (let i = minBin; i <= maxBin && i < freqData.length; i++) {
+    sum += freqData[i];
+    count++;
+  }
+  
+  return count > 0 ? (sum / count) / 255 : 0; // Normalize to 0-1
 }
 
 // Calculate energy in a frequency band
