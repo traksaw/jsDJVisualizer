@@ -1,8 +1,17 @@
 // Audio handling for DJ Visualizer
 
 let audioContext, sourceNode, meydaAnalyzer, analyserNode;
+let mediaStream; // keep reference to stop tracks
 let rms = 0, bass = 0, mid = 0, treble = 0;
 let spectrum = [];
+// Additional exposed features for UI/debug
+let spectralCentroid = 0;
+let chroma = [];
+let mfcc = [];
+
+// BPM detection variables
+let bpm = 0;
+let realtimeBpmAnalyzer = null;
 
 // Enhanced frequency analysis for DJ mixer
 let subBass = 0, lowMid = 0, highMid = 0, presence = 0, brilliance = 0;
@@ -15,7 +24,7 @@ let audioInactiveTime = 0;
 let lastAudioTime = 0;
 
 // Audio input elements - will be initialized when DOM is ready
-let startBtn, inputSelect;
+let startBtn, stopBtn, inputSelect;
 
 // Audio initialization
 async function startAudio() {
@@ -25,6 +34,7 @@ async function startAudio() {
     { audio: true };
   
   const stream = await navigator.mediaDevices.getUserMedia(constraints);
+  mediaStream = stream;
   audioContext = new (window.AudioContext || window.webkitAudioContext)();
   sourceNode = audioContext.createMediaStreamSource(stream);
   
@@ -41,6 +51,11 @@ async function startAudio() {
     featureExtractors: ['rms', 'spectralCentroid', 'mfcc', 'chroma'],
     callback: features => {
       rms = features.rms || 0;
+      spectralCentroid = features.spectralCentroid || 0;
+      chroma = features.chroma || [];
+      mfcc = features.mfcc || [];
+      
+      // BPM detection handled by realtime-bpm-analyzer
       
       // Check if audio is active (music is playing)
       const currentTime = Date.now();
@@ -81,6 +96,53 @@ async function startAudio() {
   });
   
   meydaAnalyzer.start();
+
+  // Initialize realtime-bpm-analyzer
+  try {
+    if (typeof window.realtimeBpmAnalyzer !== 'undefined') {
+      console.log('realtime-bpm-analyzer found');
+      
+      // Create the realtime BPM analyzer
+      realtimeBpmAnalyzer = await window.realtimeBpmAnalyzer.createRealTimeBpmProcessor(audioContext, {
+        continuousAnalysis: true,
+        stabilizationTime: 10000 // 10 seconds for faster adaptation
+      });
+      
+      // Get the lowpass filter
+      const lowpass = window.realtimeBpmAnalyzer.getBiquadFilter(audioContext);
+      
+      // Connect nodes: source -> lowpass -> analyzer
+      sourceNode.connect(lowpass);
+      lowpass.connect(realtimeBpmAnalyzer);
+      
+      // Listen for BPM updates
+      realtimeBpmAnalyzer.port.onmessage = (event) => {
+        if (event.data.message === 'BPM') {
+          console.log('BPM detected:', event.data.data.bpm);
+          bpm = Math.round(event.data.data.bpm);
+        }
+        if (event.data.message === 'BPM_STABLE') {
+          console.log('BPM stable:', event.data.data.bpm);
+          bpm = Math.round(event.data.data.bpm);
+        }
+      };
+      
+      console.log('Realtime BPM analyzer initialized successfully');
+    } else {
+      console.warn('realtime-bpm-analyzer not found');
+    }
+  } catch (error) {
+    console.error('Error initializing realtime BPM analyzer:', error);
+  }
+
+  // Update UI button states
+  if (startBtn) {
+    startBtn.textContent = 'Audio Started';
+    startBtn.disabled = true;
+  }
+  if (stopBtn) {
+    stopBtn.disabled = false;
+  }
 }
 
 // Calculate energy in a frequency range
@@ -138,6 +200,7 @@ async function listInputs() {
 // Initialize audio elements and input list when DOM is ready
 function initializeAudio() {
   startBtn = document.getElementById('start');
+  stopBtn = document.getElementById('stop');
   inputSelect = document.getElementById('inputs');
   
   if (navigator.mediaDevices) listInputs();
@@ -147,12 +210,77 @@ function initializeAudio() {
     startBtn.addEventListener('click', async () => {
       try {
         await startAudio();
-        startBtn.textContent = 'Audio Started';
-        startBtn.disabled = true;
       } catch (error) {
         console.error('Audio start failed:', error);
         startBtn.textContent = 'Audio Failed - Retry';
       }
     });
+  }
+
+  // Configure stop button initial state and handler
+  if (stopBtn) {
+    stopBtn.disabled = true;
+    stopBtn.addEventListener('click', () => {
+      try {
+        stopAudio();
+      } catch (e) {
+        console.error('Audio stop failed:', e);
+      }
+    });
+  }
+}
+
+// Remove old BPM detection code - now using realtime-bpm-analyzer
+
+// Stop audio analysis and release resources
+function stopAudio() {
+  try {
+    if (meydaAnalyzer) {
+      try { meydaAnalyzer.stop(); } catch (_) {}
+      meydaAnalyzer = null;
+    }
+    if (sourceNode) {
+      try { sourceNode.disconnect(); } catch (_) {}
+      sourceNode = null;
+    }
+    if (analyserNode) {
+      try { analyserNode.disconnect(); } catch (_) {}
+      analyserNode = null;
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(t => {
+        try { t.stop(); } catch (_) {}
+      });
+      mediaStream = null;
+    }
+    if (audioContext) {
+      try { if (audioContext.state !== 'closed') audioContext.close(); } catch (_) {}
+      audioContext = null;
+    }
+
+    // Reset analysis values
+    rms = 0; bass = 0; mid = 0; treble = 0;
+    subBass = 0; lowMid = 0; highMid = 0; presence = 0; brilliance = 0;
+    spectrum = [];
+    spectrumHistory = [];
+    isAudioActive = false;
+    
+    // Reset BPM detection
+    bpm = 0;
+    if (realtimeBpmAnalyzer) {
+      try { realtimeBpmAnalyzer.disconnect(); } catch (_) {}
+      realtimeBpmAnalyzer = null;
+    }
+
+    // Update UI buttons
+    if (startBtn) {
+      startBtn.textContent = 'Start';
+      startBtn.disabled = false;
+    }
+    if (stopBtn) {
+      stopBtn.disabled = true;
+    }
+  } catch (err) {
+    console.error('Error stopping audio:', err);
   }
 }

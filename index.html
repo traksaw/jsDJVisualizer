@@ -8,6 +8,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <!-- Meyda -->
     <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
+    <!-- Realtime BPM Analyzer -->
+  <script type="module">
+    import * as realtimeBpmAnalyzer from 'https://cdn.skypack.dev/realtime-bpm-analyzer';
+    window.realtimeBpmAnalyzer = realtimeBpmAnalyzer;
+  </script>
     
     <!-- Modular JS files -->
     <script src="js/audio.js"></script>
@@ -22,6 +27,7 @@
     <div class="ui">
       <div class="ui-row">
         <button id="start">Start</button>
+        <button id="stop">Stop</button>
         <select id="inputs"></select>
       </div>
       <div class="ui-row">
@@ -48,6 +54,13 @@
 
     <div class="performance-stats" id="stats">
       FPS: <span id="fps">60</span> | Particles: <span id="particleCount">0</span>
+    </div>
+
+    <div class="analysis-stats" id="analysis">
+      <div><strong>Audio:</strong> <span id="audioStatus">inactive</span> | <strong>BPM:</strong> <span id="bpmVal">0</span></div>
+      <div><strong>RMS:</strong> <span id="rmsVal">0.000</span> | <strong>Centroid (Hz):</strong> <span id="centroidVal">0</span></div>
+      <div><strong>Bass:</strong> <span id="bassVal">0.00</span> | <strong>Mid:</strong> <span id="midVal">0.00</span> | <strong>High:</strong> <span id="trebleVal">0.00</span></div>
+      <div class="features-note">Meyda: rms, spectralCentroid, mfcc, chroma + Beat Detection</div>
     </div>
 
   </body>

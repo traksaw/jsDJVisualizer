@@ -12,8 +12,14 @@ function drawSmokeMode() {
   
   const bounds = p.getVisBounds();
   
+  // Only run visualization when audio is active
+  if (!isAudioActive) {
+    particles = []; // Clear particles when audio stops
+    return;
+  }
+  
   // Only generate particles when audio is actively playing
-  if (isAudioActive && rms > 0.01) {
+  if (rms > 0.01) {
     // Bass particles (red) - left side
     let bassCount = Math.floor(bass * sensitivity * 5);
     for (let i = 0; i < bassCount; i++) {
@@ -68,8 +74,14 @@ function drawFlockingMode() {
   
   let bounds = p.getVisBounds();
   
+  // Only run visualization when audio is active
+  if (!isAudioActive) {
+    flockingBoids = []; // Clear boids when audio stops
+    return;
+  }
+  
   // Initialize boids with EQ types if needed
-  if (isAudioActive && rms > 0.02 && flockingBoids.length < 60) {
+  if (rms > 0.02 && flockingBoids.length < 60) {
     for (let i = flockingBoids.length; i < 60; i++) {
       let eqType = i < 20 ? 'bass' : (i < 40 ? 'mid' : 'high');
       let x = bounds.x + p.random(bounds.width);
@@ -112,8 +124,14 @@ function drawConnectedMode() {
   
   let bounds = p.getVisBounds();
   
+  // Only run visualization when audio is active
+  if (!isAudioActive) {
+    connectedParticles = []; // Clear particles when audio stops
+    return;
+  }
+  
   // Generate connected particles based on audio
-  if (isAudioActive && rms > 0.01) {
+  if (rms > 0.01) {
     // Bass particles (red)
     let bassCount = Math.floor(bass * sensitivity * 10);
     for (let i = 0; i < bassCount; i++) {
@@ -180,7 +198,11 @@ function drawEQMode() {
   const barWidth = bounds.width / 5;
   
   // Only show EQ bars when audio is active
-  if (isAudioActive) {
+  if (!isAudioActive) {
+    return;
+  }
+  
+  if (true) {
     // Draw EQ bars for 5-band analysis
     const bands = [
       { value: subBass, label: 'SUB', x: bounds.x },
@@ -214,8 +236,14 @@ function drawSeparatedMode() {
   
   const bounds = p.getVisBounds();
   
+  // Only run visualization when audio is active
+  if (!isAudioActive) {
+    waveformHistory = []; // Clear waveform history when audio stops
+    return;
+  }
+  
   // Only update waveform when audio is active
-  if (isAudioActive) {
+  if (true) {
     // Store waveform data for scrolling effect
     waveformHistory.push({
       subBass: subBass * sensitivity,
@@ -237,11 +265,11 @@ function drawSeparatedMode() {
   
   // Draw separated EQ waveforms
   const bands = [
-    {data: 'subBass', hue: 0, yOffset: bounds.y + bounds.height * 0.1},
-    {data: 'bass', hue: 30, yOffset: bounds.y + bounds.height * 0.25},
-    {data: 'lowMid', hue: 60, yOffset: bounds.y + bounds.height * 0.4},
-    {data: 'highMid', hue: 120, yOffset: bounds.y + bounds.height * 0.55},
-    {data: 'presence', hue: 240, yOffset: bounds.y + bounds.height * 0.7}
+    {data: 'subBass', hue: (0 + colorHue) % 360, yOffset: bounds.y + bounds.height * 0.1},
+    {data: 'bass', hue: (30 + colorHue) % 360, yOffset: bounds.y + bounds.height * 0.25},
+    {data: 'lowMid', hue: (60 + colorHue) % 360, yOffset: bounds.y + bounds.height * 0.4},
+    {data: 'highMid', hue: (120 + colorHue) % 360, yOffset: bounds.y + bounds.height * 0.55},
+    {data: 'presence', hue: (240 + colorHue) % 360, yOffset: bounds.y + bounds.height * 0.7}
   ];
   
   bands.forEach((band, bandIndex) => {

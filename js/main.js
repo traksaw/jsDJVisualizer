@@ -51,6 +51,25 @@ new p5(sketch => {
       document.getElementById('fps').textContent = Math.round(p.frameRate());
       document.getElementById('particleCount').textContent = particles.length;
       lastFpsUpdate = p.millis();
+
+      // Update audio analysis panel once per second
+      const statusEl = document.getElementById('audioStatus');
+      const bpmEl = document.getElementById('bpmVal');
+      const rmsEl = document.getElementById('rmsVal');
+      const centEl = document.getElementById('centroidVal');
+      const bassEl = document.getElementById('bassVal');
+      const midEl = document.getElementById('midVal');
+      const trebEl = document.getElementById('trebleVal');
+      if (statusEl && bpmEl && rmsEl && centEl && bassEl && midEl && trebEl) {
+        statusEl.textContent = isAudioActive ? 'active' : 'inactive';
+        bpmEl.textContent = bpm || 0;
+        rmsEl.textContent = (rms || 0).toFixed(3);
+        // spectralCentroid is in Hz already per Meyda
+        centEl.textContent = Math.round(spectralCentroid || 0);
+        bassEl.textContent = (bass || 0).toFixed(2);
+        midEl.textContent = (mid || 0).toFixed(2);
+        trebEl.textContent = (treble || 0).toFixed(2);
+      }
     }
     
     // Show audio status when no music is playing

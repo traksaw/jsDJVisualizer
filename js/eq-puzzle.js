@@ -9,11 +9,22 @@ function drawEQPuzzleMode() {
   const centerX = bounds.x + bounds.width / 2;
   const centerY = bounds.y + bounds.height / 2;
   
+  // Only run visualization when audio is active
+  if (!isAudioActive) {
+    // Clear all sparkle particles when audio stops
+    for (let i = particles.length - 1; i >= 0; i--) {
+      if (particles[i] instanceof SparkleParticle) {
+        particles.splice(i, 1);
+      }
+    }
+    return;
+  }
+  
   // Clear particles array to avoid conflicts with other modes
   particles = particles.filter(particle => particle instanceof SparkleParticle);
   
   // Only draw if we have audio data and music is playing
-  if (isAudioActive && rms > 0.01) {
+  if (rms > 0.01) {
     // Bass creates the foundation - geometric base shapes
     drawBassPuzzlePiece(centerX, centerY, bounds);
     
@@ -97,6 +108,18 @@ function drawHighPuzzlePiece(centerX, centerY, bounds) {
   const highIntensity = treble * sensitivity;
   const highColor = EQ_COLORS.high;
   
+  // Update and draw existing sparkle particles first
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const particle = particles[i];
+    if (particle instanceof SparkleParticle) {
+      particle.update();
+      particle.draw();
+      if (particle.isDead()) {
+        particles.splice(i, 1);
+      }
+    }
+  }
+  
   if (highIntensity > 0.05) {
     const burstY = bounds.y + bounds.height * 0.25; // Origin point of the burst
 
@@ -106,18 +129,6 @@ function drawHighPuzzlePiece(centerX, centerY, bounds) {
     for (let i = 0; i < numSparkles; i++) {
       const x = centerX + p.random(-bounds.width * 0.4, bounds.width * 0.4);
       particles.push(new SparkleParticle(x, burstY, highIntensity, highColor));
-    }
-    
-    // Update and draw existing sparkle particles
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const particle = particles[i];
-      if (particle instanceof SparkleParticle) {
-        particle.update();
-        particle.display();
-        if (particle.isDead()) {
-          particles.splice(i, 1);
-        }
-      }
     }
     
     // Add accent lines that radiate from the burst area
@@ -165,7 +176,7 @@ class SparkleParticle {
     this.twinkle += 0.2;
   }
   
-  display() {
+  draw() {
     p.push();
     p.colorMode(p.HSB, 360, 100, 100, 1);
     
