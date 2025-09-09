@@ -8,11 +8,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <!-- Meyda -->
     <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
-    <!-- Realtime BPM Analyzer -->
-  <script type="module">
-    import * as realtimeBpmAnalyzer from 'https://cdn.skypack.dev/realtime-bpm-analyzer';
-    window.realtimeBpmAnalyzer = realtimeBpmAnalyzer;
-  </script>
+    <!-- Web Audio Beat Detector - more reliable -->
+  <script src="https://unpkg.com/web-audio-beat-detector@8.0.0/dist/web-audio-beat-detector.min.js"></script>
     
     <!-- Modular JS files -->
     <script src="js/audio.js"></script>
@@ -37,6 +34,7 @@
         <button id="mode-eq">EQ Visual</button>
         <button id="mode-separated">EQ Waves</button>
         <button id="mode-puzzle">EQ Puzzle</button>
+        <button id="mode-spectrum">Spectrum</button>
       </div>
       <div class="slider-container">
         <label>Sensitivity:</label>

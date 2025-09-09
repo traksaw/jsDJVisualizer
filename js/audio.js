@@ -9,16 +9,18 @@ let spectralCentroid = 0;
 let chroma = [];
 let mfcc = [];
 
-// BPM detection variables
+// BPM detection variables using Web Audio approach
 let bpm = 0;
-let realtimeBpmAnalyzer = null;
+let peaks = [];
+let filteredBuffer = null;
+let sampleRate = 44100;
 
 // Enhanced frequency analysis for DJ mixer
 let subBass = 0, lowMid = 0, highMid = 0, presence = 0, brilliance = 0;
 let spectrumHistory = [];
 
 // Audio detection for visualization control
-let audioThreshold = 0.005; // Minimum RMS level to consider "music playing"
+let audioThreshold = 0.01; // Increased threshold to reduce noise sensitivity
 let isAudioActive = false;
 let audioInactiveTime = 0;
 let lastAudioTime = 0;
@@ -55,7 +57,8 @@ async function startAudio() {
       chroma = features.chroma || [];
       mfcc = features.mfcc || [];
       
-      // BPM detection handled by realtime-bpm-analyzer
+      // Web Audio BPM detection approach
+      detectBeatsWebAudio();
       
       // Check if audio is active (music is playing)
       const currentTime = Date.now();
@@ -97,43 +100,7 @@ async function startAudio() {
   
   meydaAnalyzer.start();
 
-  // Initialize realtime-bpm-analyzer
-  try {
-    if (typeof window.realtimeBpmAnalyzer !== 'undefined') {
-      console.log('realtime-bpm-analyzer found');
-      
-      // Create the realtime BPM analyzer
-      realtimeBpmAnalyzer = await window.realtimeBpmAnalyzer.createRealTimeBpmProcessor(audioContext, {
-        continuousAnalysis: true,
-        stabilizationTime: 10000 // 10 seconds for faster adaptation
-      });
-      
-      // Get the lowpass filter
-      const lowpass = window.realtimeBpmAnalyzer.getBiquadFilter(audioContext);
-      
-      // Connect nodes: source -> lowpass -> analyzer
-      sourceNode.connect(lowpass);
-      lowpass.connect(realtimeBpmAnalyzer);
-      
-      // Listen for BPM updates
-      realtimeBpmAnalyzer.port.onmessage = (event) => {
-        if (event.data.message === 'BPM') {
-          console.log('BPM detected:', event.data.data.bpm);
-          bpm = Math.round(event.data.data.bpm);
-        }
-        if (event.data.message === 'BPM_STABLE') {
-          console.log('BPM stable:', event.data.data.bpm);
-          bpm = Math.round(event.data.data.bpm);
-        }
-      };
-      
-      console.log('Realtime BPM analyzer initialized successfully');
-    } else {
-      console.warn('realtime-bpm-analyzer not found');
-    }
-  } catch (error) {
-    console.error('Error initializing realtime BPM analyzer:', error);
-  }
+  // Simple BPM detection is handled in Meyda callback
 
   // Update UI button states
   if (startBtn) {
@@ -230,7 +197,115 @@ function initializeAudio() {
   }
 }
 
-// Remove old BPM detection code - now using realtime-bpm-analyzer
+// Improved BPM detection with better accuracy
+function detectBeatsWebAudio() {
+  if (!isAudioActive) return;
+  
+  const energy = bass + subBass; // Combined low frequency energy
+  const currentTime = Date.now();
+  
+  // More selective threshold to reduce false positives
+  const threshold = 0.25; // Increased from 0.15
+  
+  if (energy > threshold) {
+    const timeSinceLastPeak = peaks.length > 0 ? currentTime - peaks[peaks.length - 1] : 1000;
+    
+    // Stricter minimum time between peaks (500ms = 120 BPM max)
+    if (timeSinceLastPeak > 500) {
+      peaks.push(currentTime);
+      
+      // Keep only recent peaks (last 8 seconds for better accuracy)
+      peaks = peaks.filter(peak => currentTime - peak < 8000);
+      
+      // Calculate BPM with at least 6 peaks for better accuracy
+      if (peaks.length >= 6) {
+        const intervals = [];
+        for (let i = 1; i < peaks.length; i++) {
+          intervals.push(peaks[i] - peaks[i-1]);
+        }
+        
+        // Filter out outlier intervals (remove top and bottom 20%)
+        intervals.sort((a, b) => a - b);
+        const trimCount = Math.floor(intervals.length * 0.2);
+        const filteredIntervals = intervals.slice(trimCount, intervals.length - trimCount);
+        
+        if (filteredIntervals.length > 0) {
+          // Use average of filtered intervals for stability
+          const avgInterval = filteredIntervals.reduce((a, b) => a + b) / filteredIntervals.length;
+          
+          let detectedBPM = 60000 / avgInterval;
+          
+          // More conservative BPM range correction
+          while (detectedBPM > 180) detectedBPM /= 2;
+          while (detectedBPM < 60) detectedBPM *= 2;
+          
+          // Ensure reasonable dance music range (70-150 BPM)
+          if (detectedBPM >= 70 && detectedBPM <= 150) {
+            detectedBPM = Math.round(detectedBPM);
+            
+            // More conservative BPM smoothing
+            if (bpm === 0) {
+              bpm = detectedBPM;
+            } else {
+              const difference = Math.abs(detectedBPM - bpm);
+              if (difference > 10) {
+                // Large change - adapt moderately
+                bpm = Math.round((bpm * 0.6) + (detectedBPM * 0.4));
+              } else {
+                // Small change - smooth heavily
+                bpm = Math.round((bpm * 0.8) + (detectedBPM * 0.2));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Count intervals between nearby peaks (from the article)
+function countIntervalsBetweenNearbyPeaks(peaks) {
+  const intervalCounts = [];
+  
+  peaks.forEach((peak, index) => {
+    for (let i = 1; i < Math.min(10, peaks.length - index); i++) {
+      const interval = peaks[index + i] - peak;
+      intervalCounts.push(interval);
+    }
+  });
+  
+  return intervalCounts;
+}
+
+// Group neighbors by tempo (from the article)
+function groupNeighborsByTempo(intervalCounts) {
+  const tempoCounts = [];
+  
+  intervalCounts.forEach(interval => {
+    const tempo = 60000 / interval;
+    
+    // Find existing tempo group or create new one
+    let found = false;
+    for (let group of tempoCounts) {
+      if (Math.abs(group.tempo - tempo) < 5) {
+        group.count++;
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      tempoCounts.push({ tempo: tempo, count: 1 });
+    }
+  });
+  
+  return tempoCounts;
+}
+
+// Initialize audio system
+function initAudio() {
+  setupAudioButtons();
+}
 
 // Stop audio analysis and release resources
 function stopAudio() {
@@ -267,10 +342,8 @@ function stopAudio() {
     
     // Reset BPM detection
     bpm = 0;
-    if (realtimeBpmAnalyzer) {
-      try { realtimeBpmAnalyzer.disconnect(); } catch (_) {}
-      realtimeBpmAnalyzer = null;
-    }
+    peaks = [];
+    filteredBuffer = null;
 
     // Update UI buttons
     if (startBtn) {

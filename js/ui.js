@@ -40,7 +40,8 @@ function initializeUI() {
     connected: document.getElementById('mode-connected'),
     eq: document.getElementById('mode-eq'),
     separated: document.getElementById('mode-separated'),
-    puzzle: document.getElementById('mode-puzzle')
+    puzzle: document.getElementById('mode-puzzle'),
+    spectrum: document.getElementById('mode-spectrum')
   };
   
   setupEventListeners();

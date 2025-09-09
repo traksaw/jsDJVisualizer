@@ -103,6 +103,9 @@ new p5(sketch => {
       case 'puzzle':
         drawEQPuzzleMode();
         break;
+      case 'spectrum':
+        drawSpectrumMode();
+        break;
     }
   };
 });
