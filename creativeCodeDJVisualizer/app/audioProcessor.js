@@ -4,12 +4,21 @@ class AudioProcessor {
     this.sourceNode = null;
     this.analyserNode = null;
     
-    // Audio data
+    // Audio processing properties
     this.rms = 0;
     this.bass = 0;
     this.mid = 0;
-    this.treble = 0;
+    this.high = 0;
     this.spectrum = [];
+    
+    // BPM detection properties
+    this.bpm = 0;
+    this.beatHistory = [];
+    this.lastBeatTime = 0;
+    this.beatThreshold = 0.1;
+    this.minBeatInterval = 300; // Minimum 300ms between beats (200 BPM max)
+    this.maxBeatInterval = 1200; // Maximum 1200ms between beats (50 BPM min)
+    this.bpmSmoothingFactor = 0.3;
     this.dataArray = null;
     this.timeDataArray = null;
     this.isRunning = false;
@@ -20,10 +29,13 @@ class AudioProcessor {
 
   async listInputs() {
     try {
-      // Request permission first
+      // Request permission first with basic constraints
       const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
       tmp.getTracks().forEach(t => t.stop());
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Could not get initial audio permission:', e.message);
+      // Continue anyway, some devices might still be available
+    }
     
     const devices = await navigator.mediaDevices.enumerateDevices();
     const allInputs = devices.filter(d => d.kind === 'audioinput');
@@ -97,18 +109,50 @@ class AudioProcessor {
   }
 
   bandEnergy(spec, sampleRate, fmin, fmax) {
-    const nyquist = sampleRate / 2;
-    const binHz = nyquist / (spec.length - 1);
-    const start = Math.max(0, Math.floor(fmin / binHz));
-    const end = Math.min(spec.length - 1, Math.ceil(fmax / binHz));
-    
-    let sum = 0;
-    for (let i = start; i <= end; i++) {
-      sum += spec[i];
+    // Validate input to prevent NaN
+    if (!spec || spec.length === 0) {
+      return { bass: 0, mid: 0, high: 0 };
     }
     
-    const count = Math.max(1, end - start + 1);
-    return sum / count;
+    const nyquist = sampleRate / 2;
+    // Calculate frequency bands with enhanced sensitivity
+    const bassEnd = Math.max(1, Math.floor(spec.length * 0.12));
+    const midEnd = Math.max(bassEnd + 1, Math.floor(spec.length * 0.45));
+    
+    let bass = 0, mid = 0, high = 0;
+    
+    // Bass (20-250Hz) - Much higher sensitivity
+    for (let i = 1; i < bassEnd; i++) {
+      const value = spec[i] || 0;
+      bass += value * value; // Square for more dramatic response
+    }
+    const bassCount = Math.max(1, bassEnd - 1);
+    bass = Math.sqrt(bass / bassCount) * 4.0; // Increased multiplier
+    
+    // Mid (250Hz-4kHz) - Enhanced sensitivity with emphasis on vocals
+    for (let i = bassEnd; i < midEnd; i++) {
+      const value = spec[i] || 0;
+      const weight = i < bassEnd * 2 ? 1.5 : 1.0; // Boost lower mids
+      mid += value * weight;
+    }
+    const midCount = Math.max(1, midEnd - bassEnd);
+    mid = mid / midCount * 3.5; // Increased multiplier
+    
+    // Highs (4kHz-20kHz) - Higher sensitivity for crisp highs
+    for (let i = midEnd; i < spec.length; i++) {
+      const value = spec[i] || 0;
+      const weight = i > spec.length * 0.8 ? 2.0 : 1.0; // Boost very high frequencies
+      high += value * weight;
+    }
+    const highCount = Math.max(1, spec.length - midEnd);
+    high = high / highCount * 5.0; // Much higher multiplier
+    
+    // Ensure no NaN values are returned
+    return { 
+      bass: isNaN(bass) ? 0 : bass, 
+      mid: isNaN(mid) ? 0 : mid, 
+      high: isNaN(high) ? 0 : high 
+    };
   }
 
   calculateRMS(timeData) {
@@ -139,31 +183,36 @@ class AudioProcessor {
       
       // Calculate frequency bands with smoothing for stable visualization
       const sr = this.audioContext.sampleRate;
-      const newBass = this.bandEnergy(this.spectrum, sr, 20, 250) * 0.175;
-      const newMid = this.bandEnergy(this.spectrum, sr, 251, 4000) * 0.375;
-      const newTreble = this.bandEnergy(this.spectrum, sr, 4001, 20000) * 0.5;
+      const bands = this.bandEnergy(this.spectrum, sr, 20, 250);
+      const newBass = (bands.bass || 0) * 0.175;
+      const newMid = (bands.mid || 0) * 0.375;
+      const newHigh = (bands.high || 0) * 0.8;
       
-      // Apply smoothing to prevent jittery visuals
-      this.bass = this.bass * 0.7 + newBass * 0.3;
-      this.mid = this.mid * 0.7 + newMid * 0.3;
-      this.treble = this.treble * 0.7 + newTreble * 0.3;
+      // Apply smoothing to prevent jittery visuals and ensure no NaN
+      this.bass = isNaN(this.bass) ? 0 : this.bass * 0.7 + (isNaN(newBass) ? 0 : newBass) * 0.3;
+      this.mid = isNaN(this.mid) ? 0 : this.mid * 0.7 + (isNaN(newMid) ? 0 : newMid) * 0.3;
+      this.high = isNaN(this.high) ? 0 : this.high * 0.7 + (isNaN(newHigh) ? 0 : newHigh) * 0.3;
       
-      // Notify listeners of data update
+      // Detect beats and calculate BPM
+      this.detectBeat();
+      
+      // Notify listeners of data update with validated data
       if (this.onDataUpdate) {
         this.onDataUpdate({
-          rms: this.rms,
-          bass: this.bass,
-          mid: this.mid,
-          treble: this.treble,
-          spectrum: this.spectrum,
-          isActive: this.rms > 0.001
+          rms: isNaN(this.rms) ? 0 : this.rms,
+          bass: isNaN(this.bass) ? 0 : this.bass,
+          mid: isNaN(this.mid) ? 0 : this.mid,
+          high: isNaN(this.high) ? 0 : this.high,
+          spectrum: this.spectrum || [],
+          bpm: this.bpm,
+          isActive: (this.rms || 0) > 0.001
         });
       }
       
     } catch (error) {
       console.error('Error in audio data update:', error);
       // Continue with fallback values
-      this.rms = this.bass = this.mid = this.treble = 0;
+      this.rms = this.bass = this.mid = this.high = 0;
     }
     
     // Continue updating
@@ -186,13 +235,7 @@ class AudioProcessor {
               autoGainControl: false
             } 
           } 
-        : { 
-            audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false
-            }
-          };
+        : { audio: true };
       
       console.log('Requesting audio with constraints:', constraints);
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -222,7 +265,7 @@ class AudioProcessor {
       this.timeDataArray = new Uint8Array(this.analyserNode.fftSize);
 
       // Reset audio values
-      this.rms = this.bass = this.mid = this.treble = 0;
+      this.rms = this.bass = this.mid = this.high = 0;
 
       // Start audio analysis loop
       this.isRunning = true;
@@ -232,8 +275,21 @@ class AudioProcessor {
       
     } catch (error) {
       this.isRunning = false;
-      console.error('Failed to start audio:', error);
-      throw error;
+      console.error('Audio start error:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to start audio: ';
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Microphone access denied. Please allow microphone permissions and try again.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No audio input device found. Please connect an audio device.';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'Audio device is busy or unavailable. Please close other applications using audio.';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      throw new Error(errorMessage);
     }
   }
 
@@ -264,10 +320,92 @@ class AudioProcessor {
     }
     
     // Reset audio data
-    this.rms = this.bass = this.mid = this.treble = 0;
+    this.rms = this.bass = this.mid = this.high = 0;
     this.spectrum = [];
+    this.bpm = 0;
+    this.beatHistory = [];
+    this.lastBeatTime = 0;
+    this.lastBassEnergy = 0;
     
     console.log('Audio stopped and cleaned up');
+  }
+
+  detectBeat() {
+    const currentTime = Date.now();
+    
+    // Use bass energy for beat detection with peak detection
+    const beatEnergy = this.bass;
+    
+    // Simple peak detection - only trigger on significant bass increases
+    if (!this.lastBassEnergy) this.lastBassEnergy = 0;
+    const bassIncrease = beatEnergy - this.lastBassEnergy;
+    const isSignificantIncrease = bassIncrease > 0.02; // Lower threshold for increase
+    
+    // Debug: Reduce logging for performance in live use
+    if (Math.random() < 0.05) { // Only 5% of the time for performance
+      console.log(`BPM Debug - Bass: ${beatEnergy.toFixed(3)}, BPM: ${this.bpm}`);
+    }
+    
+    // Check if we have a beat (bass energy above threshold AND significant increase)
+    if (beatEnergy > this.beatThreshold && isSignificantIncrease) {
+      console.log(`🥁 Beat detected! Bass: ${beatEnergy.toFixed(3)}, Increase: ${bassIncrease.toFixed(3)}`);
+      
+      // Ensure minimum time between beats to avoid false positives
+      if (currentTime - this.lastBeatTime > this.minBeatInterval) {
+        // Calculate interval since last beat
+        const interval = currentTime - this.lastBeatTime;
+        console.log(`⏱️  Beat interval: ${interval}ms`);
+        
+        // Only consider valid intervals for BPM calculation
+        if (interval >= this.minBeatInterval && interval <= this.maxBeatInterval) {
+          this.beatHistory.push(interval);
+          console.log(`✅ Valid interval added. History length: ${this.beatHistory.length}`);
+          
+          // Keep only recent beat intervals (last 6 beats for better averaging)
+          if (this.beatHistory.length > 6) {
+            this.beatHistory.shift();
+          }
+          
+          // Calculate BPM from average interval
+          if (this.beatHistory.length >= 2) {
+            const avgInterval = this.beatHistory.reduce((a, b) => a + b) / this.beatHistory.length;
+            let instantBpm = 60000 / avgInterval; // Convert ms to BPM
+            
+            // Check if we're detecting half-tempo and double it if needed
+            if (instantBpm < 90 && instantBpm > 45) {
+              console.log(`🔄 Detected half-tempo (${instantBpm.toFixed(1)}), doubling to ${(instantBpm * 2).toFixed(1)}`);
+              instantBpm *= 2;
+            }
+            
+            console.log(`📊 Avg interval: ${avgInterval.toFixed(1)}ms, Instant BPM: ${instantBpm.toFixed(1)}`);
+            
+            // Smooth BPM changes to avoid jitter
+            const oldBpm = this.bpm;
+            if (this.bpm === 0) {
+              this.bpm = instantBpm;
+            } else {
+              this.bpm = this.bpm * (1 - this.bpmSmoothingFactor) + instantBpm * this.bpmSmoothingFactor;
+            }
+            
+            // Round to nearest integer for display
+            this.bpm = Math.round(this.bpm);
+            
+            if (oldBpm !== this.bpm) {
+              console.log(`🎵 BPM updated: ${oldBpm} → ${this.bpm}`);
+            }
+          }
+        } else {
+          console.log(`❌ Invalid interval: ${interval}ms (min: ${this.minBeatInterval}, max: ${this.maxBeatInterval})`);
+        }
+        
+        this.lastBeatTime = currentTime;
+      } else {
+        console.log(`⏳ Beat too soon: ${currentTime - this.lastBeatTime}ms < ${this.minBeatInterval}ms`);
+      }
+    }
+    
+    // Store bass energy for next comparison
+    this.lastBassEnergy = beatEnergy;
   }
 
   getAudioData() {
@@ -275,8 +413,9 @@ class AudioProcessor {
       rms: this.rms,
       bass: this.bass,
       mid: this.mid,
-      treble: this.treble,
-      spectrum: this.spectrum
+      high: this.high,
+      spectrum: this.spectrum,
+      bpm: this.bpm
     };
   }
 }

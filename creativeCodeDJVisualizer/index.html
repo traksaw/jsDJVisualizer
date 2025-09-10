@@ -13,17 +13,50 @@
   </head>
   <body>
     <div class="controls">
-      <button id="start">Start Audio</button>
-      <select id="visualMode">
-        <option value="spectrum">Spectrum Bars</option>
-        <option value="particles">Floating Particles</option>
-        <option value="rings">Frequency Rings</option>
-        <option value="ascii">ASCII Art</option>
-        <option value="waves">Audio Waves</option>
-        <option value="mandala">Mandala</option>
-        <option value="tunnel">Tunnel Vision</option>
-        <option value="galaxy">Galaxy</option>
-      </select>
+      <div class="control-group">
+        <button id="start">Start Audio</button>
+        <button id="fullscreen">Fullscreen</button>
+      </div>
+      
+      <div class="control-group">
+        <label for="visualMode">Visualization:</label>
+        <select id="visualMode">
+          <option value="spectrum">Spectrum Bars</option>
+          <option value="particles">Floating Particles</option>
+          <option value="rings">Frequency Rings</option>
+          <option value="waveform">DJ Waveform</option>
+          <option value="waves">Wave Forms</option>
+          <option value="mandala">Mandala</option>
+          <option value="tunnel">Tunnel Vision</option>
+          <option value="galaxy">Galaxy</option>
+          <option value="polygons">Polygon Collage</option>
+        </select>
+      </div>
+      
+      <div class="control-group sensitivity-controls">
+        <div class="slider-group">
+          <label for="bassGain">Bass</label>
+          <input type="range" id="bassGain" min="0.1" max="3" step="0.1" value="1">
+          <span id="bassValue">1.0</span>
+        </div>
+        <div class="slider-group">
+          <label for="midGain">Mid</label>
+          <input type="range" id="midGain" min="0.1" max="3" step="0.1" value="1">
+          <span id="midValue">1.0</span>
+        </div>
+        <div class="slider-group">
+          <label for="highGain">High</label>
+          <input type="range" id="highGain" min="0.1" max="3" step="0.1" value="1">
+          <span id="highValue">1.0</span>
+        </div>
+      </div>
+      
+      <div class="status-info">
+        <span id="deviceStatus">No device selected</span>
+        <span id="bpmCounter">BPM: --</span>
+        <div class="beat-indicator" id="beatIndicator"></div>
+        <span id="fpsCounter">FPS: --</span>
+      </div>
     </div>
     
     <div class="visualizer-container">
@@ -33,19 +66,42 @@
     
     <div class="frequency-info">
       <div class="freq-band bass">
-        <span class="label">BASS</span>
-        <span class="range">20-250Hz</span>
-        <div class="level-bar"><div class="level-fill bass-fill"></div></div>
+        <div class="freq-fill bass-fill"></div>
+        <span class="freq-label">BASS</span>
+        <span class="freq-range">20-250Hz</span>
       </div>
       <div class="freq-band mid">
-        <span class="label">MID</span>
-        <span class="range">250-4kHz</span>
-        <div class="level-bar"><div class="level-fill mid-fill"></div></div>
+        <div class="freq-fill mid-fill"></div>
+        <span class="freq-label">MID</span>
+        <span class="freq-range">250-4kHz</span>
       </div>
       <div class="freq-band high">
-        <span class="label">HIGH</span>
-        <span class="range">4k-20kHz</span>
-        <div class="level-bar"><div class="level-fill high-fill"></div></div>
+        <div class="freq-fill high-fill"></div>
+        <span class="freq-label">HIGH</span>
+        <span class="freq-range">4k-20kHz</span>
+      </div>
+    </div>
+    
+    <!-- Help Overlay -->
+    <div id="helpOverlay" class="help-overlay" style="display: none;">
+      <div class="help-content">
+        <h3>🎛️ DJ Visualizer Controls</h3>
+        <div class="help-section">
+          <h4>🎹 Keyboard Shortcuts</h4>
+          <p><kbd>Space</kbd> - Start/Stop Audio</p>
+          <p><kbd>F</kbd> - Toggle Fullscreen</p>
+          <p><kbd>1-4</kbd> - Switch Visualization Modes</p>
+          <p><kbd>R</kbd> - Reset All Gains to 1.0</p>
+          <p><kbd>?</kbd> - Show/Hide This Help</p>
+        </div>
+        <div class="help-section">
+          <h4>🎚️ Live Performance Tips</h4>
+          <p>• Use Pioneer DDJ-REV1 for best audio quality</p>
+          <p>• BPM detection works best with kick drums</p>
+          <p>• Adjust frequency gains for visual balance</p>
+          <p>• Beat indicator flashes with detected tempo</p>
+        </div>
+        <p class="help-close">Press <kbd>?</kbd> or <kbd>Esc</kbd> to close</p>
       </div>
     </div>
 
