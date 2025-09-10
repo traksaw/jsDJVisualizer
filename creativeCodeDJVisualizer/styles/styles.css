@@ -1,30 +1,62 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     margin: 0;
-    padding: 20px;
+    padding: 0;
     background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 100%);
     color: #fff;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+    overflow: hidden;
 }
 
-.controls {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+.sidebar {
+  width: 300px;
+  background: rgba(0, 0, 0, 0.95);
+  backdrop-filter: blur(15px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  background: rgba(0, 0, 0, 0.9);
+  overflow-y: auto;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar-header {
   padding: 20px;
-  border-radius: 10px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  max-width: 280px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-header h2 {
+  margin: 0;
+  font-size: 1.4em;
+  font-weight: 600;
+  color: #fff;
+}
+
+.control-section {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.control-section h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.1em;
+  font-weight: 500;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .control-group {
@@ -35,29 +67,33 @@ body {
 }
 
 .sensitivity-controls {
+  display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .slider-group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 200px;
+  gap: 10px;
+  width: 100%;
 }
 
 .slider-group label {
-  min-width: 50px;
+  min-width: 45px;
+  font-size: 0.9em;
+  color: #ccc;
   font-size: 12px;
   color: #fff;
 }
 
 .slider-group input[type="range"] {
   flex: 1;
-  height: 4px;
-  background: #333;
-  border-radius: 2px;
-  outline: none;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
 }
 
 .slider-group input[type="range"]::-webkit-slider-thumb {
@@ -78,9 +114,26 @@ body {
 
 .status-info {
   display: flex;
-  gap: 20px;
-  font-size: 14px;
-  color: #888;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+}
+
+.status-label {
+  min-width: 50px;
+  color: #999;
+  font-size: 0.85em;
+}
+
+.status-item span:not(.status-label) {
+  color: #fff;
+  font-weight: 500;
 }
 
 .beat-indicator {
@@ -155,14 +208,12 @@ body {
 }
 
 .visualizer-container {
-    width: calc(100% - 320px);
-    height: 400px;
-    border: 1px solid #444;
+    flex: 1;
     background-color: #000;
     overflow: hidden;
-    margin: 20px;
     position: relative;
-    border-radius: 10px;
+    width: 100%;
+    height: 100%;
 }
 
 #spectrum-visualizer {
@@ -206,30 +257,36 @@ body {
 
 .frequency-info {
     display: flex;
-    justify-content: space-around;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 20px;
-    border-radius: 15px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    margin: 0 20px 20px 20px;
-    max-width: calc(100% - 320px);
+    gap: 10px;
+    justify-content: space-between;
+}
+
+.freq-ranges {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    margin-top: 8px;
+}
+
+.freq-ranges .freq-range {
+    flex: 1;
+    text-align: center;
 }
 
 .freq-band {
     flex: 1;
     text-align: center;
-    padding: 15px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.4);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     position: relative;
-    height: 120px;
+    height: 80px;
     justify-content: space-between;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .color-indicator {
@@ -308,17 +365,16 @@ body {
 }
 
 .freq-label {
+    font-size: 10px;
     font-weight: bold;
-    font-size: 16px;
-    color: white;
-    z-index: 2;
+    color: #fff;
+    margin-bottom: 3px;
 }
 
 .freq-range {
-    font-size: 11px;
-    opacity: 0.8;
-    color: #ccc;
-    z-index: 2;
+    font-size: 8px;
+    color: #888;
+    margin-top: 3px;
 }
 
 button {
