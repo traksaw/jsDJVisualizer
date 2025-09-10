@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>DJ Visualizer – Creative Code</title>
+    
+    <!-- External Styles -->
+    <link rel="stylesheet" href="styles/styles.css">
+    
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script src="https://unpkg.com/p5.asciify@1.3.18/lib/p5.asciify.js"></script>
+  </head>
+  <body>
+    <div class="controls">
+      <button id="start">Start Audio</button>
+      <select id="visualMode">
+        <option value="spectrum">Spectrum Bars</option>
+        <option value="particles">Floating Particles</option>
+        <option value="rings">Frequency Rings</option>
+        <option value="ascii">ASCII Art</option>
+        <option value="waves">Audio Waves</option>
+        <option value="mandala">Mandala</option>
+        <option value="tunnel">Tunnel Vision</option>
+        <option value="galaxy">Galaxy</option>
+      </select>
+    </div>
+    
+    <div class="visualizer-container">
+      <div id="spectrum-visualizer"></div>
+      <div id="p5-canvas"></div>
+    </div>
+    
+    <div class="frequency-info">
+      <div class="freq-band bass">
+        <span class="label">BASS</span>
+        <span class="range">20-250Hz</span>
+        <div class="level-bar"><div class="level-fill bass-fill"></div></div>
+      </div>
+      <div class="freq-band mid">
+        <span class="label">MID</span>
+        <span class="range">250-4kHz</span>
+        <div class="level-bar"><div class="level-fill mid-fill"></div></div>
+      </div>
+      <div class="freq-band high">
+        <span class="label">HIGH</span>
+        <span class="range">4k-20kHz</span>
+        <div class="level-bar"><div class="level-fill high-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- Application Modules -->
+    <script src="app/audioProcessor.js"></script>
+    <script src="app/visualizer.js"></script>
+    <script src="app/app.js"></script>
+  </body>
+</html>

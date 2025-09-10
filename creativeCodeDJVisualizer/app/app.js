@@ -5,13 +5,11 @@ class DJVisualizerApp {
     this.isRunning = false;
     
     this.startBtn = null;
-    this.inputSelect = null;
   }
 
   async init() {
     // Initialize DOM elements
     this.startBtn = document.getElementById('start');
-    this.inputSelect = document.getElementById('inputs');
 
     // Set up event listeners
     this.startBtn.addEventListener('click', () => this.toggleAudio());
@@ -24,56 +22,39 @@ class DJVisualizerApp {
       this.visualizer.updateAudioData(data);
     };
 
-    // Load audio inputs
-    await this.loadAudioInputs();
+    // Auto-start with default audio input
+    await this.setupDefaultAudio();
   }
 
-  async loadAudioInputs() {
+  async setupDefaultAudio() {
     if (!navigator.mediaDevices) {
       console.error('MediaDevices API not supported in this browser');
       return;
     }
 
     try {
-      console.log('Loading audio inputs...');
+      console.log('Setting up default audio input...');
       const inputs = await this.audioProcessor.listInputs();
       console.log('Available audio inputs:', inputs);
       
-      // Clear existing options
-      this.inputSelect.innerHTML = '';
-      
       if (inputs.length === 0) {
-        const option = document.createElement('option');
-        option.textContent = 'No audio inputs found';
-        this.inputSelect.appendChild(option);
         console.warn('No audio input devices detected');
         return;
       }
       
-      // Add input options
-      inputs.forEach((input, index) => {
-        const option = document.createElement('option');
-        option.value = input.deviceId;
-        option.textContent = input.label;
-        this.inputSelect.appendChild(option);
-        console.log(`Input ${index + 1}: ${input.label} (${input.deviceId})`);
-      });
-
       // Auto-select preferred input (prioritizes DDJ-REV1, then any available device)
       const preferredInput = this.audioProcessor.findDJInput(inputs);
       if (preferredInput) {
-        this.inputSelect.value = preferredInput.deviceId;
+        this.selectedDeviceId = preferredInput.deviceId;
         console.log('Auto-selected preferred input:', preferredInput.label);
       } else if (inputs.length > 0) {
         // Default to first available input if no DJ device found
-        this.inputSelect.value = inputs[0].deviceId;
+        this.selectedDeviceId = inputs[0].deviceId;
         console.log('Auto-selected first available input:', inputs[0].label);
       }
     } catch (error) {
-      console.error('Error loading audio inputs:', error);
-      const option = document.createElement('option');
-      option.textContent = 'Error loading inputs';
-      this.inputSelect.appendChild(option);
+      console.error('Error setting up default audio:', error);
+      this.selectedDeviceId = null;
     }
   }
 
@@ -87,7 +68,7 @@ class DJVisualizerApp {
 
   async startAudio() {
     try {
-      const deviceId = this.inputSelect.value || null;
+      const deviceId = this.selectedDeviceId || null;
       console.log('Starting audio with device:', deviceId);
       
       await this.audioProcessor.startAudio(deviceId);
