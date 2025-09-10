@@ -59,13 +59,15 @@ class DJVisualizerApp {
         console.log(`Input ${index + 1}: ${input.label} (${input.deviceId})`);
       });
 
-      // Auto-select DJ input (prioritizes DDJ-REV1)
-      const djInput = this.audioProcessor.findDJInput(inputs);
-      if (djInput) {
-        this.inputSelect.value = djInput.deviceId;
-        console.log('Auto-selected DJ input:', djInput.label);
-      } else {
-        console.log('No DJ input found, using default');
+      // Auto-select preferred input (prioritizes DDJ-REV1, then any available device)
+      const preferredInput = this.audioProcessor.findDJInput(inputs);
+      if (preferredInput) {
+        this.inputSelect.value = preferredInput.deviceId;
+        console.log('Auto-selected preferred input:', preferredInput.label);
+      } else if (inputs.length > 0) {
+        // Default to first available input if no DJ device found
+        this.inputSelect.value = inputs[0].deviceId;
+        console.log('Auto-selected first available input:', inputs[0].label);
       }
     } catch (error) {
       console.error('Error loading audio inputs:', error);
