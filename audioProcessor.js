@@ -26,7 +26,21 @@ class AudioProcessor {
     } catch(e) {}
     
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const inputs = devices.filter(d => d.kind === 'audioinput');
+    const allInputs = devices.filter(d => d.kind === 'audioinput');
+    
+    // Filter to show only hardware DJ controllers
+    const djDevices = allInputs.filter(d => {
+      const label = d.label.toLowerCase();
+      return label.includes('ddj') || 
+             label.includes('pioneer') ||
+             label.includes('dj');
+    });
+    
+    // If no DJ devices found, show all inputs as fallback
+    const inputs = djDevices.length > 0 ? djDevices : allInputs;
+    
+    console.log('All audio inputs:', allInputs.map(d => d.label));
+    console.log('Filtered DJ inputs:', inputs.map(d => d.label));
     
     return inputs.map((d, i) => ({
       deviceId: d.deviceId,
@@ -34,8 +48,20 @@ class AudioProcessor {
     }));
   }
 
-  findSeratoInput(inputs) {
-    return inputs.find(d => /serato/i.test(d.label));
+  findDJInput(inputs) {
+    // Look for Pioneer DDJ-REV1 first (hardware controller)
+    const ddjRev1 = inputs.find(d => /ddj.*rev1/i.test(d.label));
+    if (ddjRev1) return ddjRev1;
+    
+    // Look for any DDJ controller
+    const ddj = inputs.find(d => /ddj/i.test(d.label));
+    if (ddj) return ddj;
+    
+    // Look for Pioneer devices
+    const pioneer = inputs.find(d => /pioneer/i.test(d.label));
+    if (pioneer) return pioneer;
+    
+    return null;
   }
 
   bandEnergy(spec, sampleRate, fmin, fmax) {
@@ -71,17 +97,17 @@ class AudioProcessor {
     // Get time domain data for RMS calculation
     this.analyserNode.getByteTimeDomainData(this.timeDataArray);
     
-    // Calculate RMS
-    this.rms = this.calculateRMS(this.timeDataArray);
+    // Calculate RMS with 65% reduction (30% + 50% of remaining)
+    this.rms = this.calculateRMS(this.timeDataArray) * 0.35;
     
     // Convert byte frequency data to float spectrum
     this.spectrum = Array.from(this.dataArray).map(val => val / 255);
     
-    // Calculate frequency bands using proper EQ ranges
+    // Calculate frequency bands using proper EQ ranges with different reductions
     const sr = this.audioContext.sampleRate;
-    this.bass = this.bandEnergy(this.spectrum, sr, 20, 250);     // Bass: 20-250 Hz (sub-bass + fundamental bass)
-    this.mid = this.bandEnergy(this.spectrum, sr, 251, 6000);    // Mid: 251-6000 Hz
-    this.treble = this.bandEnergy(this.spectrum, sr, 6001, 20000); // High: 6001-20000 Hz
+    this.bass = this.bandEnergy(this.spectrum, sr, 20, 250) * 0.15;      // Bass: 20-250 Hz (85% reduction)
+    this.mid = this.bandEnergy(this.spectrum, sr, 251, 6000) * 0.35;    // Mid: 251-6000 Hz (65% reduction)
+    this.treble = this.bandEnergy(this.spectrum, sr, 6001, 20000) * 0.35; // High: 6001-20000 Hz (65% reduction)
     
     // Notify listeners of data update
     if (this.onDataUpdate) {
@@ -112,7 +138,7 @@ class AudioProcessor {
 
     this.sourceNode = this.audioContext.createMediaStreamSource(stream);
 
-    // Use only AnalyserNode - no deprecated ScriptProcessorNode
+    // Use only AnalyserNode - no deprecated ScriptProcessorNode becasue of error 
     this.analyserNode = this.audioContext.createAnalyser();
     this.analyserNode.fftSize = 1024;
     this.analyserNode.smoothingTimeConstant = 0.8;

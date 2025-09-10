@@ -59,13 +59,13 @@ class DJVisualizerApp {
         console.log(`Input ${index + 1}: ${input.label} (${input.deviceId})`);
       });
 
-      // Auto-select Serato if available
-      const seratoInput = this.audioProcessor.findSeratoInput(inputs);
-      if (seratoInput) {
-        this.inputSelect.value = seratoInput.deviceId;
-        console.log('Auto-selected Serato input:', seratoInput.label);
+      // Auto-select DJ input (prioritizes DDJ-REV1)
+      const djInput = this.audioProcessor.findDJInput(inputs);
+      if (djInput) {
+        this.inputSelect.value = djInput.deviceId;
+        console.log('Auto-selected DJ input:', djInput.label);
       } else {
-        console.log('No Serato input found, using default');
+        console.log('No DJ input found, using default');
       }
     } catch (error) {
       console.error('Error loading audio inputs:', error);
