@@ -21,9 +21,10 @@
     </div>
 
     <script>
-      let audioContext, sourceNode, meydaAnalyzer, analyserNode;
+      let audioContext, sourceNode, analyserNode;
       let rms = 0, bass = 0, mid = 0, treble = 0;
       let spectrum = [];
+      let dataArray, timeDataArray;
 
       const startBtn = document.getElementById('start');
       const inputSelect = document.getElementById('inputs');
@@ -54,6 +55,40 @@
         return sum / count;
       }
 
+      function calculateRMS(timeData) {
+        let sum = 0;
+        for (let i = 0; i < timeData.length; i++) {
+          const normalized = (timeData[i] - 128) / 128;
+          sum += normalized * normalized;
+        }
+        return Math.sqrt(sum / timeData.length);
+      }
+
+      function updateAudioData() {
+        if (!analyserNode) return;
+        
+        // Get frequency data
+        analyserNode.getByteFrequencyData(dataArray);
+        
+        // Get time domain data for RMS calculation
+        analyserNode.getByteTimeDomainData(timeDataArray);
+        
+        // Calculate RMS
+        rms = calculateRMS(timeDataArray);
+        
+        // Convert byte frequency data to float spectrum
+        spectrum = Array.from(dataArray).map(val => val / 255);
+        
+        // Calculate frequency bands using proper EQ ranges
+        const sr = audioContext.sampleRate;
+        bass = bandEnergy(spectrum, sr, 20, 250);     // Bass: 20-250 Hz (sub-bass + fundamental bass)
+        mid = bandEnergy(spectrum, sr, 251, 6000);    // Mid: 251-6000 Hz (overlaps slightly with bass)
+        treble = bandEnergy(spectrum, sr, 6001, 20000); // High: 6001-20000 Hz
+        
+        // Continue updating
+        requestAnimationFrame(updateAudioData);
+      }
+
       async function startAudio() {
         const deviceId = inputSelect.value || undefined;
         const constraints = deviceId ? { audio: { deviceId: { exact: deviceId } } } : { audio: true };
@@ -64,27 +99,19 @@
 
         sourceNode = audioContext.createMediaStreamSource(stream);
 
-        // Optional extra analyser if you want smoothing later
+        // Use only AnalyserNode - no deprecated ScriptProcessorNode
         analyserNode = audioContext.createAnalyser();
         analyserNode.fftSize = 1024;
+        analyserNode.smoothingTimeConstant = 0.8;
         sourceNode.connect(analyserNode);
 
-        meydaAnalyzer = Meyda.createMeydaAnalyzer({
-          audioContext,
-          source: sourceNode,
-          bufferSize: 512,
-          featureExtractors: ['rms', 'amplitudeSpectrum'],
-          callback: (features) => {
-            rms = features.rms || 0;
-            spectrum = features.amplitudeSpectrum || spectrum;
+        // Initialize data arrays
+        const bufferLength = analyserNode.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        timeDataArray = new Uint8Array(analyserNode.fftSize);
 
-            const sr = audioContext.sampleRate;
-            bass   = bandEnergy(spectrum, sr,  20,  250);
-            mid    = bandEnergy(spectrum, sr, 250, 2000);
-            treble = bandEnergy(spectrum, sr, 2000, 8000);
-          }
-        });
-        meydaAnalyzer.start();
+        // Start audio analysis loop
+        updateAudioData();
       }
 
       // p5 sketch
@@ -115,9 +142,9 @@
           // 3-band bars
           const barW = w / 6;
           const maxH = h * 0.6;
-          const bassH = p.constrain(p.map(bass,   0, 0.10, 0, maxH), 0, maxH);
-          const midH  = p.constrain(p.map(mid,    0, 0.05, 0, maxH), 0, maxH);
-          const trebH = p.constrain(p.map(treble, 0, 0.02, 0, maxH), 0, maxH);
+          const bassH = p.constrain(p.map(bass,   0, 0.25, 0, maxH), 0, maxH);
+          const midH  = p.constrain(p.map(mid,    0, 0.30, 0, maxH), 0, maxH);
+          const trebH = p.constrain(p.map(treble, 0, 0.20, 0, maxH), 0, maxH);
 
           p.fill(255,80,80);   p.rect(w*0.2 - barW/2, h - bassH, barW, bassH);
           p.fill(80,255,120);  p.rect(w*0.5 - barW/2, h - midH,  barW, midH);
