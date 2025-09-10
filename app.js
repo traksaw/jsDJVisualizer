@@ -96,19 +96,6 @@ class DJVisualizerApp {
       
       console.log('DJ Visualizer started successfully');
       
-      // Debug: Log audio data after a short delay
-      setTimeout(() => {
-        const data = this.audioProcessor.getAudioData();
-        console.log('Audio data check:', data);
-        if (data.rms === 0 && data.bass === 0 && data.mid === 0 && data.treble === 0) {
-          console.warn('No audio signal detected. Check:');
-          console.warn('1. Browser microphone permissions');
-          console.warn('2. Correct audio input device selected');
-          console.warn('3. Audio source is playing and not muted');
-          console.warn('4. Serato/mixer output is properly configured');
-        }
-      }, 2000);
-      
     } catch (error) {
       console.error('Error starting audio:', error);
       console.error('Error details:', error.name, error.message);

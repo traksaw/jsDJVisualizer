@@ -84,11 +84,10 @@ class DJVisualizer {
     const barW = this.w / 6;
     const maxH = this.h * 0.6;
     
-    // Balanced scaling for neutral EQ position (12 o'clock)
-    // Using similar scaling ranges to match mixer behavior
-    const bassH = p.constrain(p.map(this.audioData.bass, 0, 0.08, 0, maxH), 0, maxH);
-    const midH = p.constrain(p.map(this.audioData.mid, 0, 0.08, 0, maxH), 0, maxH);
-    const trebH = p.constrain(p.map(this.audioData.treble, 0, 0.08, 0, maxH), 0, maxH);
+    // Less sensitive scaling for better dynamic range
+    const bassH = p.constrain(p.map(this.audioData.bass, 0, 0.25, 0, maxH), 0, maxH);
+    const midH = p.constrain(p.map(this.audioData.mid, 0, 0.30, 0, maxH), 0, maxH);
+    const trebH = p.constrain(p.map(this.audioData.treble, 0, 0.20, 0, maxH), 0, maxH);
 
     p.noStroke();
 
