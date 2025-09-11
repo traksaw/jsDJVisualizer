@@ -348,18 +348,18 @@ class AudioProcessor {
     
     // Check if we have a beat (bass energy above threshold AND significant increase)
     if (beatEnergy > this.beatThreshold && isSignificantIncrease) {
-      console.log(`🥁 Beat detected! Bass: ${beatEnergy.toFixed(3)}, Increase: ${bassIncrease.toFixed(3)}`);
+      console.log(`Beat detected! Bass: ${beatEnergy.toFixed(3)}, Increase: ${bassIncrease.toFixed(3)}`);
       
       // Ensure minimum time between beats to avoid false positives
       if (currentTime - this.lastBeatTime > this.minBeatInterval) {
         // Calculate interval since last beat
         const interval = currentTime - this.lastBeatTime;
-        console.log(`⏱️  Beat interval: ${interval}ms`);
+        console.log(`Beat interval: ${interval}ms`);
         
         // Only consider valid intervals for BPM calculation
         if (interval >= this.minBeatInterval && interval <= this.maxBeatInterval) {
           this.beatHistory.push(interval);
-          console.log(`✅ Valid interval added. History length: ${this.beatHistory.length}`);
+          console.log(`Valid interval added. History length: ${this.beatHistory.length}`);
           
           // Keep only recent beat intervals (last 6 beats for better averaging)
           if (this.beatHistory.length > 6) {
@@ -373,11 +373,11 @@ class AudioProcessor {
             
             // Check if we're detecting half-tempo and double it if needed
             if (instantBpm < 90 && instantBpm > 45) {
-              console.log(`🔄 Detected half-tempo (${instantBpm.toFixed(1)}), doubling to ${(instantBpm * 2).toFixed(1)}`);
+              console.log(`Detected half-tempo (${instantBpm.toFixed(1)}), doubling to ${(instantBpm * 2).toFixed(1)}`);
               instantBpm *= 2;
             }
             
-            console.log(`📊 Avg interval: ${avgInterval.toFixed(1)}ms, Instant BPM: ${instantBpm.toFixed(1)}`);
+            console.log(`Avg interval: ${avgInterval.toFixed(1)}ms, Instant BPM: ${instantBpm.toFixed(1)}`);
             
             // Smooth BPM changes to avoid jitter
             const oldBpm = this.bpm;
@@ -391,16 +391,16 @@ class AudioProcessor {
             this.bpm = Math.round(this.bpm);
             
             if (oldBpm !== this.bpm) {
-              console.log(`🎵 BPM updated: ${oldBpm} → ${this.bpm}`);
+              console.log(`BPM updated: ${oldBpm} → ${this.bpm}`);
             }
           }
         } else {
-          console.log(`❌ Invalid interval: ${interval}ms (min: ${this.minBeatInterval}, max: ${this.maxBeatInterval})`);
+          console.log(`Invalid interval: ${interval}ms (min: ${this.minBeatInterval}, max: ${this.maxBeatInterval})`);
         }
         
         this.lastBeatTime = currentTime;
       } else {
-        console.log(`⏳ Beat too soon: ${currentTime - this.lastBeatTime}ms < ${this.minBeatInterval}ms`);
+        console.log(`Beat too soon: ${currentTime - this.lastBeatTime}ms < ${this.minBeatInterval}ms`);
       }
     }
     

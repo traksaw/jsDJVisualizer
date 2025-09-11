@@ -93,7 +93,7 @@ class DJVisualizerApp {
         high: data.high * this.highGain
       };
       this.visualizer.updateAudioData(adjustedData);
-      console.log(`📡 Received BPM data: ${data.bpm}`);
+      console.log(`Received BPM data: ${data.bpm}`);
       this.updateBPM(data.bpm);
       this.updateFPS();
     };
@@ -297,7 +297,7 @@ class DJVisualizerApp {
   updateBPM(bpm) {
     if (this.bpmCounter) {
       this.bpmCounter.textContent = `BPM: ${bpm || '--'}`;
-      console.log(`🎛️ UI BPM Display: ${bpm || '--'}`);
+      console.log(`UI BPM Display: ${bpm || '--'}`);
     }
     
     // Flash beat indicator when BPM is detected
