@@ -22,6 +22,7 @@ class DJVisualizerApp {
     // Initialize DOM elements
     this.startBtn = document.getElementById('start');
     this.fullscreenBtn = document.getElementById('fullscreen');
+    this.audioInputSelect = document.getElementById('audioInputSelect');
     this.deviceStatusSpan = document.getElementById('deviceStatus');
     this.bpmCounter = document.getElementById('bpmCounter');
     this.beatIndicator = document.getElementById('beatIndicator');
@@ -30,6 +31,7 @@ class DJVisualizerApp {
     // Set up event listeners
     this.startBtn.addEventListener('click', () => this.toggleAudio());
     this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+    this.audioInputSelect.addEventListener('change', () => this.onDeviceSelectionChange());
     
     // Set up gain controls
     this.setupGainControls();
@@ -98,40 +100,134 @@ class DJVisualizerApp {
       this.updateFPS();
     };
 
-    // Populate audio devices and auto-start
+    // Check permissions and populate audio devices
+    await this.checkAudioPermissions();
     await this.populateAudioDevices();
-    await this.setupDefaultAudio();
   }
 
-  async setupDefaultAudio() {
+  async checkAudioPermissions() {
+    try {
+      // Check if we already have permission
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+      console.log('Microphone permission status:', permissionStatus.state);
+      
+      if (permissionStatus.state === 'denied') {
+        this.deviceStatusSpan.textContent = 'Microphone access denied';
+        console.warn('Microphone permission denied');
+        return false;
+      } else if (permissionStatus.state === 'granted') {
+        this.deviceStatusSpan.textContent = 'Microphone access granted';
+        return true;
+      } else {
+        this.deviceStatusSpan.textContent = 'Click Start to request audio access';
+        return null; // Permission will be requested when needed
+      }
+    } catch (error) {
+      console.warn('Could not check microphone permissions:', error);
+      this.deviceStatusSpan.textContent = 'Ready to request audio access';
+      return null;
+    }
+  }
+
+  async populateAudioDevices() {
     if (!navigator.mediaDevices) {
       console.error('MediaDevices API not supported in this browser');
+      this.deviceStatusSpan.textContent = 'MediaDevices API not supported';
       return;
     }
 
     try {
-      console.log('Setting up default audio input...');
+      console.log('Enumerating audio input devices...');
       const inputs = await this.audioProcessor.listInputs();
       console.log('Available audio inputs:', inputs);
       
+      // Clear existing options except the first one
+      while (this.audioInputSelect.children.length > 1) {
+        this.audioInputSelect.removeChild(this.audioInputSelect.lastChild);
+      }
+      
       if (inputs.length === 0) {
         console.warn('No audio input devices detected');
+        this.deviceStatusSpan.textContent = 'No audio devices found';
         return;
       }
       
-      // Auto-select preferred input (prioritizes DDJ-REV1, then any available device)
+      // Add all available inputs to the dropdown
+      inputs.forEach(input => {
+        const option = document.createElement('option');
+        option.value = input.deviceId;
+        option.textContent = input.label;
+        
+        // Mark DJ devices with a special indicator
+        if (input.isDJ) {
+          option.textContent = `🎧 ${input.label}`;
+        }
+        
+        this.audioInputSelect.appendChild(option);
+      });
+      
+      // Auto-select preferred input (prioritizes DJ devices)
       const preferredInput = this.audioProcessor.findDJInput(inputs);
       if (preferredInput) {
+        this.audioInputSelect.value = preferredInput.deviceId;
         this.selectedDeviceId = preferredInput.deviceId;
+        this.deviceStatusSpan.textContent = `Ready: ${preferredInput.label}`;
         console.log('Auto-selected preferred input:', preferredInput.label);
       } else if (inputs.length > 0) {
         // Default to first available input if no DJ device found
+        this.audioInputSelect.value = inputs[0].deviceId;
         this.selectedDeviceId = inputs[0].deviceId;
+        this.deviceStatusSpan.textContent = `Ready: ${inputs[0].label}`;
         console.log('Auto-selected first available input:', inputs[0].label);
       }
+      
     } catch (error) {
-      console.error('Error setting up default audio:', error);
+      console.error('Error enumerating audio devices:', error);
+      this.deviceStatusSpan.textContent = 'Error detecting devices';
       this.selectedDeviceId = null;
+    }
+  }
+
+  onDeviceSelectionChange() {
+    const selectedValue = this.audioInputSelect.value;
+    
+    if (selectedValue === '') {
+      // Auto-select mode
+      this.selectedDeviceId = null;
+      this.deviceStatusSpan.textContent = 'Auto-select mode';
+    } else {
+      // Specific device selected
+      this.selectedDeviceId = selectedValue;
+      const selectedOption = this.audioInputSelect.selectedOptions[0];
+      this.deviceStatusSpan.textContent = `Selected: ${selectedOption.textContent.replace('🎧 ', '')}`;
+    }
+    
+    console.log('Device selection changed to:', this.selectedDeviceId || 'auto-select');
+    
+    // If audio is currently running, restart with new device
+    if (this.isRunning) {
+      console.log('Restarting audio with new device...');
+      this.restartAudioWithNewDevice();
+    }
+  }
+
+  async restartAudioWithNewDevice() {
+    try {
+      // Stop current audio
+      this.audioProcessor.stop();
+      
+      // Small delay to ensure cleanup
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Start with new device
+      await this.audioProcessor.startAudio(this.selectedDeviceId);
+      this.visualizer.start();
+      
+      console.log('Audio restarted with new device');
+    } catch (error) {
+      console.error('Failed to restart audio with new device:', error);
+      this.stopAudio();
+      alert('Failed to switch audio device. Please try again.');
     }
   }
 
@@ -145,26 +241,71 @@ class DJVisualizerApp {
 
   async startAudio() {
     try {
-      await this.audioProcessor.startAudio();
-      this.visualizer.start(); // Start visualizer
+      // Update UI to show attempting to start
+      this.deviceStatusSpan.textContent = 'Requesting audio access...';
+      this.startBtn.textContent = 'Starting...';
+      this.startBtn.disabled = true;
+      
+      // Use selected device or let the system auto-select
+      await this.audioProcessor.startAudio(this.selectedDeviceId);
+      this.visualizer.start();
       this.isRunning = true;
       this.startBtn.textContent = 'Stop';
       this.startBtn.style.backgroundColor = '#ff4444';
+      this.startBtn.disabled = false;
       
-      console.log('DJ Visualizer started');
+      // Update status to show active device
+      const currentDevice = this.selectedDeviceId ? 
+        this.audioInputSelect.selectedOptions[0]?.textContent.replace('🎧 ', '') : 
+        'Auto-selected device';
+      this.deviceStatusSpan.textContent = `Active: ${currentDevice}`;
+      
+      console.log('DJ Visualizer started with device:', currentDevice);
     } catch (error) {
       console.error('Failed to start audio:', error);
-      alert('Failed to start audio. Please check your microphone permissions.');
+      this.startBtn.textContent = 'Start';
+      this.startBtn.style.backgroundColor = '';
+      this.startBtn.disabled = false;
+      
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to start audio: ';
+      let statusMessage = 'Audio failed';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage += 'Microphone access denied. Please click the microphone icon in your browser\'s address bar and allow access.';
+        statusMessage = 'Permission denied';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage += 'No audio input device found. Please connect a microphone or audio device.';
+        statusMessage = 'No device found';
+      } else if (error.name === 'NotReadableError') {
+        errorMessage += 'Audio device is busy. Please close other applications using the microphone.';
+        statusMessage = 'Device busy';
+      } else if (error.name === 'OverconstrainedError') {
+        errorMessage += 'Selected audio device is not available. Try selecting a different device.';
+        statusMessage = 'Device unavailable';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred.';
+        statusMessage = 'Error occurred';
+      }
+      
+      this.deviceStatusSpan.textContent = statusMessage;
+      alert(errorMessage);
     }
   }
 
   stopAudio() {
     this.audioProcessor.stop();
-    this.visualizer.stop(); // Stop visualizer
+    this.visualizer.stop();
     
     this.isRunning = false;
     this.startBtn.textContent = 'Start';
     this.startBtn.style.backgroundColor = '';
+    
+    // Update status to show ready state
+    const selectedDevice = this.selectedDeviceId ? 
+      this.audioInputSelect.selectedOptions[0]?.textContent.replace('🎧 ', '') : 
+      'Auto-select mode';
+    this.deviceStatusSpan.textContent = `Ready: ${selectedDevice}`;
     
     console.log('DJ Visualizer stopped');
   }
@@ -229,24 +370,9 @@ class DJVisualizerApp {
     }
   }
   
-  async autoSelectAudioDevice() {
-    try {
-      const inputs = await this.audioProcessor.listInputs();
-      
-      // Auto-select DJ device if found
-      const djDevice = this.audioProcessor.findDJInput(inputs);
-      if (djDevice) {
-        this.deviceStatusSpan.textContent = `Auto-selected: ${djDevice.label}`;
-        return djDevice.deviceId;
-      } else {
-        this.deviceStatusSpan.textContent = 'Using default audio device';
-        return null;
-      }
-    } catch (error) {
-      console.error('Error selecting audio device:', error);
-      this.deviceStatusSpan.textContent = 'Using default audio device';
-      return null;
-    }
+  async refreshAudioDevices() {
+    console.log('Refreshing audio device list...');
+    await this.populateAudioDevices();
   }
   
   

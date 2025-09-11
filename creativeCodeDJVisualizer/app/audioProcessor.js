@@ -29,7 +29,7 @@ class AudioProcessor {
 
   async listInputs() {
     try {
-      // Request permission first with basic constraints
+      // Request permission first with basic constraints to ensure we can see device labels
       const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
       tmp.getTracks().forEach(t => t.stop());
     } catch(e) {
@@ -40,37 +40,30 @@ class AudioProcessor {
     const devices = await navigator.mediaDevices.enumerateDevices();
     const allInputs = devices.filter(d => d.kind === 'audioinput');
     
-    // Show all available audio inputs
-    const inputs = allInputs;
+    console.log('All detected audio inputs:', allInputs.map(d => ({
+      id: d.deviceId,
+      label: d.label || 'Unknown Device',
+      groupId: d.groupId
+    })));
     
-    console.log('Available audio inputs:', inputs.map(d => d.label));
-    
-    // Remove duplicates and redundant default entries
-    const uniqueInputs = [];
+    // Process all inputs to create a clean list
+    const processedInputs = [];
     const seenLabels = new Set();
     const seenDeviceIds = new Set();
     
-    inputs.forEach((d, i) => {
-      let label = d.label || `Input ${i+1}`;
-      
-      // Skip if we've already seen this exact device ID
-      if (seenDeviceIds.has(d.deviceId)) {
+    allInputs.forEach((device, index) => {
+      // Skip if we've already processed this exact device ID
+      if (seenDeviceIds.has(device.deviceId)) {
         return;
       }
       
-      // Remove "Default - " prefix if the base device name already exists
-      if (label.startsWith('Default - ')) {
-        const baseLabel = label.replace('Default - ', '');
-        const hasBaseDevice = inputs.some(input => 
-          input.deviceId !== d.deviceId && 
-          (input.label === baseLabel || input.label?.includes(baseLabel))
-        );
-        if (hasBaseDevice) {
-          return; // Skip this default entry as the actual device exists
-        }
-      }
+      let label = device.label || `Audio Input ${index + 1}`;
       
-      // Handle duplicate labels by adding a counter
+      // Clean up common label prefixes/suffixes
+      label = label.replace(/^Default - /, '');
+      label = label.replace(/ \(.*Built-in.*\)$/, ' (Built-in)');
+      
+      // Handle duplicate labels by adding device type info
       if (seenLabels.has(label)) {
         let counter = 2;
         let newLabel = `${label} (${counter})`;
@@ -82,14 +75,38 @@ class AudioProcessor {
       }
       
       seenLabels.add(label);
-      seenDeviceIds.add(d.deviceId);
-      uniqueInputs.push({
-        deviceId: d.deviceId,
-        label: label
+      seenDeviceIds.add(device.deviceId);
+      
+      processedInputs.push({
+        deviceId: device.deviceId,
+        label: label,
+        groupId: device.groupId,
+        isDJ: this.isDJDevice(label),
+        isBuiltIn: this.isBuiltInDevice(label)
       });
     });
     
-    return uniqueInputs;
+    // Sort inputs: DJ devices first, then built-in, then others
+    processedInputs.sort((a, b) => {
+      if (a.isDJ && !b.isDJ) return -1;
+      if (!a.isDJ && b.isDJ) return 1;
+      if (a.isBuiltIn && !b.isBuiltIn) return 1;
+      if (!a.isBuiltIn && b.isBuiltIn) return -1;
+      return a.label.localeCompare(b.label);
+    });
+    
+    console.log('Processed audio inputs:', processedInputs);
+    return processedInputs;
+  }
+
+  isDJDevice(label) {
+    const djKeywords = ['ddj', 'pioneer', 'serato', 'traktor', 'rekordbox', 'djm', 'cdj'];
+    return djKeywords.some(keyword => label.toLowerCase().includes(keyword));
+  }
+
+  isBuiltInDevice(label) {
+    const builtInKeywords = ['built-in', 'internal', 'macbook', 'imac'];
+    return builtInKeywords.some(keyword => label.toLowerCase().includes(keyword));
   }
 
   findDJInput(inputs) {
@@ -226,19 +243,50 @@ class AudioProcessor {
       // Stop any existing audio first
       this.stop();
       
-      const constraints = deviceId 
-        ? { 
-            audio: { 
-              deviceId: { exact: deviceId },
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false
-            } 
+      // Check if MediaDevices API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('MediaDevices API not supported in this browser');
+      }
+      
+      let constraints;
+      if (deviceId) {
+        // Try with exact device first, then fallback to ideal
+        constraints = { 
+          audio: { 
+            deviceId: { exact: deviceId },
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            sampleRate: 44100
           } 
-        : { audio: true };
+        };
+      } else {
+        // Use more permissive constraints for auto-select
+        constraints = { 
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false,
+            sampleRate: 44100
+          }
+        };
+      }
       
       console.log('Requesting audio with constraints:', constraints);
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (exactError) {
+        if (deviceId && exactError.name === 'OverconstrainedError') {
+          console.warn('Exact device constraint failed, trying with ideal constraint:', exactError);
+          // Fallback to ideal constraint
+          constraints.audio.deviceId = { ideal: deviceId };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } else {
+          throw exactError;
+        }
+      }
       
       // Store stream for cleanup
       this.stream = stream;
