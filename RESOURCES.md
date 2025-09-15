@@ -185,6 +185,18 @@ All modes use the same band color semantics:
 7. End by showing the Polygon Collage for a dramatic finish.
 
 
+## BPM Detection Resources
+The current implementation in `app/audioProcessor.js` uses a lightweight custom approach (`detectBeat()`) based on bass energy peaks with interval averaging and smoothing. For more robust or alternative BPM/onset detection strategies, these resources are helpful:
+  - Meyda (feature extraction – spectral flux, energy, etc.): https://meyda.js.org/
+  - music-tempo (tempo estimation from onset arrays): https://github.com/ibbatta/music-tempo
+  - web-audio-beat-detector (utility for BPM estimation via Web Audio): https://github.com/chrisguttandin/web-audio-beat-detector
+  - Chris Wilson – Beat Detection Using Web Audio: https://www.html5rocks.com/en/tutorials/webaudio/beat-detection/ (archived)
+  - aubio.js (onset/beat detection compiled to JS/WebAssembly): https://github.com/aubio/aubiojs
+  - Essentia.js (comprehensive audio analysis in the browser): https://mtg.github.io/essentia.js/
+  
+Tip: You can keep the fast custom detector for responsiveness and overlay a slower, more stable library estimate to refine the displayed BPM.
+
+
 ## License and Attribution
 - Libraries: p5.js and p5.asciify are used under their respective licenses.
 - Credit the meetup and contributors where appropriate.
